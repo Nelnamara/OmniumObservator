@@ -1,0 +1,6 @@
+package-as: OmniumObservator
+ignore:
+  - .pkgmeta
+  - .gitignore
+  - .github
+  - README.md
