@@ -4,7 +4,7 @@
 ## Author: Nelnamara
 ## Version: 1.0.0
 ## SavedVariables: OmniumObservatorDB
-## X-Curse-Project-ID:
+## X-Curse-Project-ID: 1577117
 ## X-Website: https://github.com/Nelnamara/OmniumObservator
 ## X-License: All Rights Reserved
 
