@@ -9,7 +9,7 @@
 OmniumObservator = {}
 local OO = OmniumObservator
 
-OO.version = "1.0.0"
+OO.version = "1.0.1"
 
 -- Achievement IDs (confirmed from 12.0.7 PTR datamine)
 local ACH_OMNIUM_FOLIO   = 63325
