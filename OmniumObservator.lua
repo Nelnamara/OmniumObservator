@@ -13,6 +13,17 @@ OO.version = "1.0.1"
 
 -- Achievement IDs (confirmed from 12.0.7 PTR datamine)
 local ACH_OMNIUM_FOLIO   = 63325
+
+-- Five-week questline — one quest per weekly reset, permanent unlock (not repeatable).
+-- Quest IDs confirmed from Wowhead live database (June 2026).
+local WEEKLY_QUESTS = {
+    { id = 96410, week = 1, name = "The Omnium Folio"   },
+    { id = 96441, week = 2, name = "Leyline Assaults"   },
+    { id = 96442, week = 3, name = "Off-World Magic"    },
+    { id = 96443, week = 4, name = "Ritualized Arcana"  },
+    { id = 96444, week = 5, name = "Magical Primessence" },
+}
+
 -- Fallback sub-achievement names in display order (week 1 → 5)
 local WEEK_NAMES = {
     "The Sunstrider Omnium",
@@ -60,11 +71,39 @@ function OO:GetAchievementData()
     }
 end
 
-function OO:GetWeeklyQuest()
-    local qid = self.db.weeklyQuestID
-    if not qid then return nil, nil end
-    local done = C_QuestLog.IsQuestFlaggedCompleted(qid)
-    return done, "Seeking Knowledge"
+-- Auto-detects which of the 5 Seeking Knowledge weeks is current without any
+-- manual /oo questid input. Weeks are permanent one-time unlocks, so completed
+-- quests stay flagged forever and we can infer progress from that.
+function OO:GetWeeklyState()
+    -- First: is any weekly actively in the quest log right now?
+    local numEntries = C_QuestLog.GetNumQuestLogEntries()
+    for i = 1, numEntries do
+        local info = C_QuestLog.GetInfo(i)
+        if info and not info.isHeader then
+            for _, q in ipairs(WEEKLY_QUESTS) do
+                if info.questID == q.id then
+                    return { week = q.week, name = q.name, inLog = true, done = false }
+                end
+            end
+        end
+    end
+
+    -- No active quest — determine progress from permanent completion flags
+    local highestDone = 0
+    for _, q in ipairs(WEEKLY_QUESTS) do
+        if C_QuestLog.IsQuestFlaggedCompleted(q.id) then
+            if q.week > highestDone then highestDone = q.week end
+        end
+    end
+
+    if highestDone >= 5 then
+        return { week = 5, name = "Magical Primessence", done = true, allDone = true }
+    elseif highestDone > 0 then
+        local next = WEEKLY_QUESTS[highestDone + 1]
+        return { week = next.week, name = next.name, done = false, inLog = false, nextReset = true }
+    else
+        return { week = 1, name = "The Omnium Folio", done = false, inLog = false, nextReset = false }
+    end
 end
 
 local ROW_H   = 18
@@ -137,8 +176,8 @@ end
 function OO:Refresh()
     if not self.frame then return end
 
-    local achData             = self:GetAchievementData()
-    local weeklyDone, wqName  = self:GetWeeklyQuest()
+    local achData  = self:GetAchievementData()
+    local ws       = self:GetWeeklyState()
 
     local lines = {}
 
@@ -157,19 +196,24 @@ function OO:Refresh()
 
     lines[#lines + 1] = "sep"
 
-    -- 5 weekly rows
+    -- 5 weekly rows (driven by achievement criteria)
     for i, step in ipairs(achData.steps) do
         lines[#lines + 1] = string.format("%s |cFFCCCCCC%s|r", Check(step.done), step.name)
     end
 
-    -- Weekly quest
+    -- Current week's "Seeking Knowledge" quest state (auto-detected)
     lines[#lines + 1] = "sep"
-    if weeklyDone ~= nil then
-        lines[#lines + 1] = string.format("%s |cFFAADDFF%s|r", Check(weeklyDone), wqName)
-    elseif self.db.weeklyQuestID then
-        lines[#lines + 1] = "|cFF888888Checking weekly quest...|r"
+    if ws.allDone then
+        lines[#lines + 1] = "|cFF66FF66All 5 weeks complete — Folio fully unlocked!|r"
+    elseif ws.inLog then
+        lines[#lines + 1] = string.format(
+            "|cFFFFDD88Week %d: %s — In progress|r", ws.week, ws.name)
+    elseif ws.nextReset then
+        lines[#lines + 1] = string.format(
+            "|cFF888888Week %d: %s — available next reset|r", ws.week, ws.name)
     else
-        lines[#lines + 1] = "|cFF888888/oo questid <id>  to track weekly|r"
+        lines[#lines + 1] = string.format(
+            "|cFF888888Week 1: %s — pick up quest in Silvermoon|r", ws.name)
     end
 
     self:RenderLines(lines)
@@ -245,23 +289,33 @@ SlashCmdList["OMNIUMOBSERVATOR"] = function(msg)
     local cmd, arg = (msg or ""):match("^%s*(%S*)%s*(.*)")
     cmd = cmd:lower()
     if cmd == "questid" then
+        -- Legacy override — the addon now auto-detects all 5 weekly quest IDs.
+        -- This command is kept for troubleshooting only.
         local qid = tonumber(arg)
         if qid then
             OO.db.weeklyQuestID = qid
-            print("|cFFFFCC00OmniumObservator|r weekly quest ID set to " .. qid)
+            print("|cFFFFCC00OmniumObservator|r manual quest ID override set to " .. qid)
+            print("  Note: auto-detection is active. Override only needed if auto-detect fails.")
             OO:Refresh()
         else
-            print("|cFFFFCC00OmniumObservator|r Usage: /oo questid <number>")
-            print("  Discover ID in-game:")
-            print("  /run print(C_QuestLog.GetQuestIDByName(\"Seeking Knowledge\"))")
+            print("|cFFFFCC00OmniumObservator|r The addon auto-detects weekly quest progress.")
+            print("  Known IDs: 96410 (wk1) 96441 (wk2) 96442 (wk3) 96443 (wk4) 96444 (wk5)")
         end
     elseif cmd == "debug" then
         print("|cFFFFCC00OmniumObservator|r " .. OO.version)
-        print("  Weekly quest ID:", tostring(OO.db.weeklyQuestID))
         local achData = OO:GetAchievementData()
         print("  Achievement " .. ACH_OMNIUM_FOLIO .. " complete:", tostring(achData.overall))
         for i, step in ipairs(achData.steps) do
             print(string.format("  Week %d [%s] %s", i, step.done and "✓" or " ", step.name))
+        end
+        local ws = OO:GetWeeklyState()
+        print(string.format("  Weekly state: week=%d name=%s inLog=%s done=%s allDone=%s nextReset=%s",
+            ws.week or 0, ws.name or "?",
+            tostring(ws.inLog), tostring(ws.done),
+            tostring(ws.allDone), tostring(ws.nextReset)))
+        for _, q in ipairs(WEEKLY_QUESTS) do
+            print(string.format("    Quest %d (wk%d): completed=%s",
+                q.id, q.week, tostring(C_QuestLog.IsQuestFlaggedCompleted(q.id))))
         end
     elseif cmd == "lock" then
         OO.db.locked = true
