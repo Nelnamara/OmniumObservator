@@ -9,7 +9,7 @@
 OmniumObservator = {}
 local OO = OmniumObservator
 
-OO.version = "1.0.1"
+OO.version = "1.0.2"
 
 -- Achievement IDs (confirmed from 12.0.7 PTR datamine)
 local ACH_OMNIUM_FOLIO   = 63325
@@ -291,7 +291,7 @@ function OO:BuildMinimapButton()
     if self.minimapBtn then return end
     local db = self.db
     local btn = CreateFrame("Button", "OOMinimapButton", Minimap)
-    btn:SetSize(32, 32)
+    btn:SetSize(24, 24)
     btn:SetFrameStrata("MEDIUM")
     btn:SetFrameLevel(8)
     btn:EnableMouse(true)

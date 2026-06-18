@@ -3,7 +3,7 @@
 ## Notes: Omnium Folio tracker - monitors folio progress, upgrade paths, weekly caps, and optimal next steps for the 12.0.7 power system.
 ## IconTexture: Interface\AddOns\OmniumObservator\Media\icon.png
 ## Author: Nelnamara
-## Version: 1.0.1
+## Version: 1.0.2
 ## SavedVariables: OmniumObservatorDB
 ## X-Curse-Project-ID: 1577117
 ## X-Website: https://github.com/Nelnamara/OmniumObservator
