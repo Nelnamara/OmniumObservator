@@ -40,6 +40,8 @@ local DEFAULTS = {
     locked       = false,
     alpha        = 0.9,
     weeklyQuestID = nil,
+    minimapAngle = 225,
+    minimapHide  = false,
 }
 
 local function Check(done)
@@ -262,6 +264,80 @@ function OO:SavePosition()
     end
 end
 
+-- Minimap button — left-click toggles the panel, right-click dumps state, drag repositions.
+local MM_RADIUS = 80
+local function OOAngleOffset(a)
+    return MM_RADIUS * math.cos(math.rad(a)), MM_RADIUS * math.sin(math.rad(a))
+end
+
+function OO:BuildMinimapButton()
+    if self.minimapBtn then return end
+    local db = self.db
+    local btn = CreateFrame("Button", "OOMinimapButton", Minimap)
+    btn:SetSize(32, 32)
+    btn:SetFrameStrata("MEDIUM")
+    btn:SetFrameLevel(8)
+    btn:EnableMouse(true)
+    btn:RegisterForDrag("LeftButton")
+    btn:RegisterForClicks("AnyUp")
+
+    local icon = btn:CreateTexture(nil, "BACKGROUND")
+    icon:SetAllPoints()
+    icon:SetTexture("Interface\\AddOns\\OmniumObservator\\Media\\minimap.png")
+    icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+
+    if btn.CreateMaskTexture then
+        local mask = btn:CreateMaskTexture()
+        mask:SetAllPoints(icon)
+        mask:SetTexture("Interface\\CharacterFrame\\TempPortraitAlphaMask",
+            "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
+        icon:AddMaskTexture(mask)
+    end
+
+    local border = btn:CreateTexture(nil, "OVERLAY")
+    border:SetSize(54, 54)
+    border:SetPoint("CENTER")
+    border:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
+
+    btn:SetPoint("CENTER", Minimap, "CENTER", OOAngleOffset(db.minimapAngle or 225))
+
+    btn:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+        GameTooltip:AddLine("|cFFFFCC00OmniumObservator|r " .. (OO.version or ""))
+        GameTooltip:AddLine("Left-click: Toggle panel", 1, 1, 1)
+        GameTooltip:AddLine("Right-click: Dump state", 1, 1, 1)
+        GameTooltip:AddLine("Drag: Reposition", 0.7, 0.7, 0.7)
+        GameTooltip:Show()
+    end)
+    btn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+    btn:SetScript("OnClick", function(_, button)
+        if button == "RightButton" then
+            SlashCmdList["OMNIUMOBSERVATOR"]("debug")
+        elseif OO.frame then
+            OO.frame:SetShown(not OO.frame:IsShown())
+        end
+    end)
+
+    btn:SetScript("OnDragStart", function(self)
+        self:SetScript("OnUpdate", function(self)
+            local mx, my = Minimap:GetCenter()
+            local px, py = GetCursorPosition()
+            local s = UIParent:GetEffectiveScale()
+            local angle = math.deg(math.atan2(py / s - my, px / s - mx))
+            OO.db.minimapAngle = angle
+            self:ClearAllPoints()
+            self:SetPoint("CENTER", Minimap, "CENTER", OOAngleOffset(angle))
+        end)
+    end)
+    btn:SetScript("OnDragStop", function(self)
+        self:SetScript("OnUpdate", nil)
+    end)
+
+    if db.minimapHide then btn:Hide() end
+    self.minimapBtn = btn
+end
+
 local ef = CreateFrame("Frame", "OOEventFrame")
 ef:RegisterEvent("ADDON_LOADED")
 ef:SetScript("OnEvent", function(self, event, ...)
@@ -272,6 +348,7 @@ ef:SetScript("OnEvent", function(self, event, ...)
             if OO.db[k] == nil then OO.db[k] = v end
         end
         OO:BuildUI()
+        OO:BuildMinimapButton()
         OO:Refresh()
         self:RegisterEvent("ACHIEVEMENT_EARNED")
         self:RegisterEvent("CRITERIA_UPDATE")
