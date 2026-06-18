@@ -16,8 +16,13 @@ Knowledge" weekly quest, a live Void-Touched Orbs counter, and a minimap button.
 ## Slash
 `/oo` (toggle) · `debug` (dump state) · `questid` (legacy override) · `lock`/`unlock` · `reset`
 
-## Roadmap (in design)
-Integrate with Blizzard's **Omnium Folio frame** (opens from a minimap icon) — surface our tracked info (weekly quest, next step, Motes of Omnial Inquiry currency, orb count, rune build) as a single point inside/next to that frame instead of a separate panel. Need the folio frame's name/API (grab in-game via `/dump`/`/api` or `/fstack`).
+## Roadmap (in design) — dock to the Omnium Folio frame
+Pivot OO from a standalone panel into a companion docked to the folio (single point of info, no extra clutter). Findings from `/fstack`:
+- Folio frame = **`ExpansionLandingPage.Overlay.MidnightLandingOverlay.RunesOfPowerFrame`**, built on `Blizzard_SharedTalentUI` (AutoCommitTraitFrame) — **it is a Traits tree**. Opens from the minimap's Midnight expansion-landing button; lives in the LoadOnDemand `Blizzard_ExpansionLandingPage` (hook after that addon loads).
+- Runes (slotted / empowered) are therefore readable via **`C_Traits`**.
+- **Motes of Omnial Inquiry are the trait-tree currency** (`C_Traits.GetTreeCurrencyInfo`), NOT a `C_CurrencyInfo` currency — that's why they don't show in the currency tab.
+- **Phase 1:** hook `RunesOfPowerFrame`'s OnShow, anchor a non-secure dock showing: weekly Seeking Knowledge line + next step, Mote count, weekly reset timer (`C_DateAndTime.GetSecondsUntilWeeklyReset`), week progress, and the live orb counter. Minimap button opens the folio. Refresh out of combat / on events; never taint the folio frame.
+- **Need (in-game):** folio `configID`/`treeID` — with the folio open: `/dump ExpansionLandingPage.Overlay.MidnightLandingOverlay.RunesOfPowerFrame:GetConfigID()` then `C_Traits.GetConfigInfo(<id>)`.
 
 ## Build / release / deploy
 - BigWigs packager on **`v*` tag push**. CurseForge secret: **`CURSFORGE_API_KEY`** (misspelled, leave as-is).
