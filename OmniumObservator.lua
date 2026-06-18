@@ -113,6 +113,15 @@ local FRAME_W = 265
 local TITLE_H = 20
 local PAD     = 6
 
+local RUNE_VOID_ORBS = 1279596  -- Rune of Void-Touched Orbs; player aura stacks 0-5
+
+-- Returns the current Void-Touched Orb count (0-5) if the rune's aura is up, else nil.
+function OO:GetVoidOrbs()
+    local aura = C_UnitAuras and C_UnitAuras.GetPlayerAuraBySpellID(RUNE_VOID_ORBS)
+    if not aura then return nil end
+    return aura.applications or 0
+end
+
 function OO:BuildUI()
     local db = self.db
 
@@ -182,6 +191,14 @@ function OO:Refresh()
     local ws       = self:GetWeeklyState()
 
     local lines = {}
+
+    -- Void-Touched Orbs live counter (Omnium Folio core rune resource)
+    local orbs = self:GetVoidOrbs()
+    if orbs then
+        lines[#lines + 1] = string.format(
+            "|cFFBB66FFVoid-Touched Orbs:|r |cFFFFFFFF%d|r|cFF888888/5|r", orbs)
+        lines[#lines + 1] = "sep"
+    end
 
     -- Overall achievement header
     local unlockedCount = 0
@@ -340,9 +357,18 @@ ef:SetScript("OnEvent", function(self, event, ...)
         self:RegisterEvent("ACHIEVEMENT_EARNED")
         self:RegisterEvent("CRITERIA_UPDATE")
         self:RegisterEvent("QUEST_LOG_UPDATE")
+        self:RegisterEvent("UNIT_AURA")
         self:RegisterEvent("PLAYER_LOGOUT")
     elseif event == "ACHIEVEMENT_EARNED" or event == "CRITERIA_UPDATE" or event == "QUEST_LOG_UPDATE" then
         OO:Refresh()
+    elseif event == "UNIT_AURA" then
+        if ... == "player" then
+            local now = GetTime()
+            if now - (OO.lastAuraRefresh or 0) > 0.2 then
+                OO.lastAuraRefresh = now
+                OO:Refresh()
+            end
+        end
     elseif event == "PLAYER_LOGOUT" then
         OO:SavePosition()
     end
