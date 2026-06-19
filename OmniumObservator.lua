@@ -410,8 +410,10 @@ function OO:BuildLeftLines()
     end
     lines[#lines + 1] = "sep"
 
+    -- Each week shows its loot-rarity colour (the full ladder is visible); the
+    -- check vs bullet shows progress. Locked weeks are name-coloured but marked.
     for i, step in ipairs(weeks.steps) do
-        local color = step.done and (WEEK_COLORS[i] or "FFCCCCCC") or WEEK_DIM
+        local color = WEEK_COLORS[i] or "FFCCCCCC"
         lines[#lines + 1] = string.format("%s |c%s%s|r", Check(step.done), color, step.name)
     end
 
