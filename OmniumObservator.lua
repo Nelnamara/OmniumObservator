@@ -91,43 +91,65 @@ local RUNE_IDS = {
     lingering = 1287555, overload = 1279614, residual = 1279615, echoes = 1279616,
 }
 
--- Role-based recommended builds (5 rows: Core / Defensive / Lingering / Stat / Capstone).
--- All builds open with Void-Touched Orbs (the safe core for nearly all specs).
+-- Role-based recommended builds (5 rows: Core / Defensive / Lingering / Stat / Capstone),
+-- from two sources. Folio-guide builds open with Void-Touched Orbs (safe core); Method.gg
+-- (raiding/DPS authority) leans Unleashed Fire as the core. Cycle with [>] or /oo build.
 local ROLE_BUILDS = {
-    { role = "Mythic+", tiers = {
+    { role = "M+ |cFF888888· Guide|r", tiers = {
         { "Core", "Void-Touched Orbs", RUNE_IDS.orbs },
         { "Def",  "Void-Tainted Shell", RUNE_IDS.shell },
         { "Ling", "Lingering", RUNE_IDS.lingering },
         { "Stat", "spec priority", nil },
         { "Cap",  "Overload", RUNE_IDS.overload },
     } },
-    { role = "Raid (ST)", tiers = {
+    { role = "Raid ST |cFF888888· Guide|r", tiers = {
         { "Core", "Void-Touched Orbs", RUNE_IDS.orbs },
         { "Def",  "Void-Tainted Shell", RUNE_IDS.shell },
         { "Ling", "Lingering", RUNE_IDS.lingering },
         { "Stat", "spec priority", nil },
         { "Cap",  "Echoes", RUNE_IDS.echoes },
     } },
-    { role = "Raid (DoT)", tiers = {
+    { role = "Raid DoT |cFF888888· Guide|r", tiers = {
         { "Core", "Void-Touched Orbs", RUNE_IDS.orbs },
         { "Def",  "Void-Tainted Shell", RUNE_IDS.shell },
         { "Ling", "Lingering", RUNE_IDS.lingering },
         { "Stat", "spec priority", nil },
         { "Cap",  "Residual Energy", RUNE_IDS.residual },
     } },
-    { role = "PvP", tiers = {
+    { role = "PvP |cFF888888· Guide|r", tiers = {
         { "Core", "Void-Touched Orbs", RUNE_IDS.orbs },
         { "Def",  "Lynxlike Reflexes", RUNE_IDS.lynx },
         { "Ling", "Lingering", RUNE_IDS.lingering },
         { "Stat", "Versatility", nil },
         { "Cap",  "Overload", RUNE_IDS.overload },
     } },
-    { role = "Casual", tiers = {
+    { role = "Casual |cFF888888· Guide|r", tiers = {
         { "Core", "Void-Touched Orbs", RUNE_IDS.orbs },
         { "Def",  "Self-Mending", RUNE_IDS.mend },
         { "Ling", "Lingering", RUNE_IDS.lingering },
         { "Stat", "Versatility", nil },
         { "Cap",  "Overload", RUNE_IDS.overload },
+    } },
+    { role = "DPS |cFF54A3FF· Method.gg|r", tiers = {
+        { "Core", "Unleashed Fire", RUNE_IDS.fire },
+        { "Def",  "Void-Tainted Shell", RUNE_IDS.shell },
+        { "Ling", "Lingering", RUNE_IDS.lingering },
+        { "Stat", "spec priority", nil },
+        { "Cap",  "Overload", RUNE_IDS.overload },
+    } },
+    { role = "M+ |cFF54A3FF· Method.gg|r", tiers = {
+        { "Core", "Unleashed Fire", RUNE_IDS.fire },
+        { "Def",  "Void-Tainted Shell", RUNE_IDS.shell },
+        { "Ling", "Lingering", RUNE_IDS.lingering },
+        { "Stat", "spec priority", nil },
+        { "Cap",  "Echoes", RUNE_IDS.echoes },
+    } },
+    { role = "Raid DoT |cFF54A3FF· Method.gg|r", tiers = {
+        { "Core", "Unleashed Fire", RUNE_IDS.fire },
+        { "Def",  "Void-Tainted Shell", RUNE_IDS.shell },
+        { "Ling", "Lingering", RUNE_IDS.lingering },
+        { "Stat", "spec priority", nil },
+        { "Cap",  "Residual Energy", RUNE_IDS.residual },
     } },
 }
 
