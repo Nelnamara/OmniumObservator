@@ -56,6 +56,11 @@ local PALETTE = {
     dim    = "FF888888",
 }
 
+-- The 5 weeks light up in WoW loot-rarity colours as they're unlocked:
+-- common(white) → uncommon(green) → rare(blue) → epic(purple) → legendary(orange).
+local WEEK_COLORS = { "FFFFFFFF", "FF1EFF00", "FF0070DD", "FFA335EE", "FFFF8000" }
+local WEEK_DIM    = "FF555555"
+
 local CHECK_DONE = "|TInterface\\RaidFrame\\ReadyCheck-Ready:0|t"
 local function Check(done)
     if done then return CHECK_DONE end
@@ -248,7 +253,7 @@ function OO:CreatePanel(name, strata, titleText, showLogo)
         fs:Hide()
         panel.linePool[i] = fs
     end
-    for i = 1, 5 do
+    for i = 1, 8 do
         local sep = f:CreateTexture(nil, "BACKGROUND")
         sep:SetSize(FRAME_W - 20, 1)
         sep:SetColorTexture(0.60, 0.50, 0.10, 0.4)
@@ -379,59 +384,14 @@ function OO:OnFolioHidden()
     end
 end
 
--- Shared content builder — both panels render the same line list.
+-- Standalone "detached" panel mirrors the embed: the left (weeks / tasks / reset)
+-- and right (Voidstorm resources) content combined into one panel, same theme.
 function OO:BuildLines()
-    local weeks = self:GetWeeks()
-    local ws    = self:GetWeeklyState()
-    local lines = {}
-
-    -- Folio resources (shown when the values are known)
-    local motes = self:GetMotes()
-    local orbs  = self:GetVoidOrbs()
-    local reset = self:GetResetSeconds()
-    if motes then
-        lines[#lines + 1] = string.format(
-            "|c" .. PALETTE.gold .. "Motes of Omnial Inquiry:|r |cFFFFFFFF%d|r", motes)
-    end
-    if orbs then
-        lines[#lines + 1] = string.format(
-            "|c" .. PALETTE.purple .. "Void-Touched Orbs:|r |cFFFFFFFF%d|r|c" .. PALETTE.dim .. "/5|r", orbs)
-    end
-    if reset then
-        lines[#lines + 1] = string.format(
-            "|c" .. PALETTE.dim .. "Weekly reset in|r |cFFFFFFFF%s|r", FmtDur(reset))
-    end
-    if motes or orbs or reset then lines[#lines + 1] = "sep" end
-
-    -- Header + week progress (driven by permanent quest-completion flags)
-    if weeks.allDone then
-        lines[#lines + 1] = "|c" .. PALETTE.gold .. "Omnium Folio Studies: |cFF66FF66COMPLETE|r"
-    else
-        lines[#lines + 1] = string.format(
-            "|c" .. PALETTE.gold .. "Omnium Folio|r  |cFFFFFFFF%d|r|c" .. PALETTE.dim .. "/5 weeks|r", weeks.unlocked)
-    end
+    local lines = self:BuildLeftLines()
     lines[#lines + 1] = "sep"
-
-    -- 5 weekly rows with check/bullet visuals
-    for _, step in ipairs(weeks.steps) do
-        lines[#lines + 1] = string.format("%s |cFFCCCCCC%s|r", Check(step.done), step.name)
+    for _, l in ipairs(self:BuildRightLines()) do
+        lines[#lines + 1] = l
     end
-
-    -- Current week's "Seeking Knowledge" quest state (auto-detected)
-    lines[#lines + 1] = "sep"
-    if ws.allDone then
-        lines[#lines + 1] = "|cFF66FF66All 5 weeks complete — Folio fully unlocked!|r"
-    elseif ws.inLog then
-        lines[#lines + 1] = string.format(
-            "|cFFFFDD88Week %d: %s — In progress|r", ws.week, ws.name)
-    elseif ws.nextReset then
-        lines[#lines + 1] = string.format(
-            "|c" .. PALETTE.dim .. "Week %d: %s — available next reset|r", ws.week, ws.name)
-    else
-        lines[#lines + 1] = string.format(
-            "|c" .. PALETTE.dim .. "Week 1: %s — pick up quest in Silvermoon|r", ws.name)
-    end
-
     return lines
 end
 
@@ -450,8 +410,9 @@ function OO:BuildLeftLines()
     end
     lines[#lines + 1] = "sep"
 
-    for _, step in ipairs(weeks.steps) do
-        lines[#lines + 1] = string.format("%s |cFFCCCCCC%s|r", Check(step.done), step.name)
+    for i, step in ipairs(weeks.steps) do
+        local color = step.done and (WEEK_COLORS[i] or "FFCCCCCC") or WEEK_DIM
+        lines[#lines + 1] = string.format("%s |c%s%s|r", Check(step.done), color, step.name)
     end
 
     lines[#lines + 1] = "sep"
@@ -592,9 +553,14 @@ local function OOConfigSlider(parent, name, label, lowTxt, highTxt, lo, hi, val,
     s:SetValueStep(0.05)
     s:SetObeyStepOnDrag(true)
     s:SetValue(val)
-    _G[name .. "Low"]:SetText(lowTxt)
-    _G[name .. "High"]:SetText(highTxt)
-    _G[name .. "Text"]:SetText(label)
+    -- Region names vary across client versions — guard so a missing one can't
+    -- error out of BuildConfig (which left a half-built, unclosable frame).
+    local low  = _G[name .. "Low"]  or s.Low
+    local high = _G[name .. "High"] or s.High
+    local text = _G[name .. "Text"] or s.Text
+    if low  then low:SetText(lowTxt) end
+    if high then high:SetText(highTxt) end
+    if text then text:SetText(label) end
     s:SetScript("OnValueChanged", function(_, v) onChange(v) end)
     return s
 end
@@ -606,12 +572,16 @@ function OO:BuildConfig()
     f:SetSize(290, 250)
     f:SetPoint("CENTER")
     f:SetFrameStrata("DIALOG")
+    f:SetToplevel(true)
     f:SetMovable(true)
     f:EnableMouse(true)
     f:RegisterForDrag("LeftButton")
     f:SetClampedToScreen(true)
     f:SetScript("OnDragStart", f.StartMoving)
     f:SetScript("OnDragStop", f.StopMovingOrSizing)
+    f:SetScript("OnHide", function(s) s:StopMovingOrSizing() end)
+    -- Escape closes it (guaranteed close path — the old build could get stuck).
+    tinsert(UISpecialFrames, "OOConfigFrame")
     f:SetBackdrop({
         bgFile   = "Interface\\Buttons\\WHITE8x8",
         edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
@@ -627,6 +597,7 @@ function OO:BuildConfig()
 
     local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
     close:SetPoint("TOPRIGHT", 2, 2)
+    close:SetScript("OnClick", function() f:Hide() end)
 
     OOConfigSlider(f, "OOConfigOpacity", "Opacity", "30%", "100%", 0.3, 1.0, self.db.alpha or 0.9, -52,
         function(v) OO.db.alpha = v; OO:ApplyAppearance() end)
