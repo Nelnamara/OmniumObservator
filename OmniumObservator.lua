@@ -849,6 +849,9 @@ end
 function OO:RenderLines(panel, lines)
     local frame   = panel.frame
     local headerH = panel.headerH or TITLE_H
+    local fsize   = self.db.fontSize or 12
+    local rowH    = fsize + 6
+    local fontPath = select(1, GameFontHighlightSmall:GetFont())
     local sepIdx  = 1
     local lineIdx = 0
     local yOff    = 0
@@ -858,20 +861,21 @@ function OO:RenderLines(panel, lines)
             local sep = panel.sepPool[sepIdx]
             if sep then
                 sep:ClearAllPoints()
-                sep:SetPoint("TOPLEFT", frame, "TOPLEFT", PAD + 4, -(headerH + yOff + ROW_H / 2))
+                sep:SetPoint("TOPLEFT", frame, "TOPLEFT", PAD + 4, -(headerH + yOff + rowH / 2))
                 sep:Show()
                 sepIdx = sepIdx + 1
-                yOff = yOff + ROW_H / 2
+                yOff = yOff + rowH / 2
             end
         else
             lineIdx = lineIdx + 1
             local fs = panel.linePool[lineIdx]
             if fs then
+                if fontPath then pcall(function() fs:SetFont(fontPath, fsize, "") end) end
                 fs:ClearAllPoints()
                 fs:SetPoint("TOPLEFT", frame, "TOPLEFT", PAD + 2, -(headerH + yOff + 4))
                 fs:SetText(entry)
                 fs:Show()
-                yOff = yOff + ROW_H
+                yOff = yOff + rowH
             end
         end
     end
@@ -1222,6 +1226,15 @@ SlashCmdList["OMNIUMOBSERVATOR"] = function(msg)
         end
     elseif cmd == "config" or cmd == "options" then
         OO:BuildConfig()
+    elseif cmd == "font" then
+        local n = tonumber(arg)
+        if n then
+            OO.db.fontSize = math.max(8, math.min(20, math.floor(n)))
+            OO:Refresh()
+            print("|cFFFFCC00OmniumObservator|r font size " .. OO.db.fontSize)
+        else
+            print("|cFFFFCC00OmniumObservator|r usage: /oo font <8-20> (current " .. (OO.db.fontSize or 12) .. ")")
+        end
     elseif cmd == "build" then
         if arg and arg ~= "" then
             local a = arg:lower()
