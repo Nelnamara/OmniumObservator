@@ -11,7 +11,7 @@
 OmniumObservator = {}
 local OO = OmniumObservator
 
-OO.version = "1.0.3"
+OO.version = "1.0.4"
 
 -- Achievement IDs (confirmed from 12.0.7 PTR datamine)
 local ACH_OMNIUM_FOLIO   = 63325
@@ -41,6 +41,7 @@ local WEEK_NAMES = {
 local FOLIO_TREE_ID    = 1186
 local MOTES_CURRENCY   = 4230
 local RUNE_VOID_ORBS   = 1279596  -- Rune of Void-Touched Orbs; player aura stacks 0-5
+local NEBULOUS_VOIDCORE = 3418    -- bonus-roll currency (confirmed in-game via /oo scan)
 
 -- Suite branding palette (purple / gold / black)
 local PALETTE = {
@@ -170,15 +171,26 @@ function OO:GetResetSeconds()
     return s
 end
 
+-- Generic currency quantity by ID (pcall-guarded). Used for Nebulous Voidcore etc.
+function OO:GetCurrency(id)
+    if not (C_CurrencyInfo and C_CurrencyInfo.GetCurrencyInfo) then return nil end
+    local q
+    pcall(function()
+        local info = C_CurrencyInfo.GetCurrencyInfo(id)
+        if info and info.quantity then q = info.quantity end
+    end)
+    return q
+end
+
 local ROW_H   = 18
 local FRAME_W = 265
 local TITLE_H = 22
 local PAD     = 6
 
--- Builds a backdrop panel (branded) with a header logo + title, a divider, and
--- pooled line/separator widgets. Returns { frame, linePool, sepPool }. Shared by
--- the standalone panel and the folio dock.
-function OO:CreatePanel(name, strata)
+-- Builds a backdrop panel (branded) with a header (optional logo) + title, a
+-- divider, and pooled line/separator widgets. Returns { frame, linePool, sepPool }.
+-- Shared by the standalone panel and the two embedded folio panels.
+function OO:CreatePanel(name, strata, titleText, showLogo)
     local f = CreateFrame("Frame", name, UIParent, "BackdropTemplate")
     f:SetSize(FRAME_W, TITLE_H + ROW_H * 9 + PAD * 2)
     f:SetFrameStrata(strata or "MEDIUM")
@@ -192,14 +204,17 @@ function OO:CreatePanel(name, strata)
     f:SetBackdropColor(unpack(PALETTE.bg))
     f:SetBackdropBorderColor(unpack(PALETTE.border))
 
-    local logo = f:CreateTexture(nil, "ARTWORK")
-    logo:SetSize(16, 16)
-    logo:SetPoint("TOPLEFT", f, "TOPLEFT", PAD, -3)
-    logo:SetTexture("Interface\\AddOns\\OmniumObservator\\Media\\icon.png")
-
     local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    title:SetPoint("LEFT", logo, "RIGHT", 4, 0)
-    title:SetText("|c" .. PALETTE.title .. "OmniumObservator|r  |c" .. PALETTE.dim .. OO.version .. "|r")
+    if showLogo then
+        local logo = f:CreateTexture(nil, "ARTWORK")
+        logo:SetSize(16, 16)
+        logo:SetPoint("TOPLEFT", f, "TOPLEFT", PAD, -3)
+        logo:SetTexture("Interface\\AddOns\\OmniumObservator\\Media\\icon.png")
+        title:SetPoint("LEFT", logo, "RIGHT", 4, 0)
+    else
+        title:SetPoint("TOPLEFT", f, "TOPLEFT", PAD + 2, -5)
+    end
+    title:SetText(titleText or ("|c" .. PALETTE.title .. "OmniumObservator|r"))
 
     local divider = f:CreateTexture(nil, "BACKGROUND")
     divider:SetSize(FRAME_W - 16, 1)
@@ -228,7 +243,8 @@ end
 
 function OO:BuildUI()
     local db = self.db
-    local panel = self:CreatePanel("OOMainFrame", "MEDIUM")
+    local panel = self:CreatePanel("OOMainFrame", "MEDIUM",
+        "|c" .. PALETTE.title .. "OmniumObservator|r  |c" .. PALETTE.dim .. OO.version .. "|r", true)
     local frame = panel.frame
     frame:SetPoint("CENTER", UIParent, "CENTER", db.x, db.y)
     frame:SetScale(db.scale)
@@ -250,12 +266,14 @@ function OO:BuildUI()
     self.frame = frame
 end
 
--- Lazily create the dock panel (anchored to the folio frame when it opens).
+-- Lazily create the two embedded panels (anchored INSIDE the folio's empty
+-- columns when it opens). Parented to UIParent so we never taint the Traits frame.
 function OO:BuildDock()
-    if self.dock then return end
-    local panel = self:CreatePanel("OODockFrame", "HIGH")
-    panel.frame:Hide()
-    self.dock = panel
+    if self.dockL then return end
+    self.dockL = self:CreatePanel("OODockLeft",  "HIGH", "|c" .. PALETTE.title .. "This week|r", false)
+    self.dockR = self:CreatePanel("OODockRight", "HIGH", "|c" .. PALETTE.title .. "Voidstorm|r", false)
+    self.dockL.frame:Hide()
+    self.dockR.frame:Hide()
 end
 
 -- Locate the Omnium Folio frame (only present once Blizzard_ExpansionLandingPage
@@ -300,7 +318,7 @@ function OO:ScheduleFolioHook()
 end
 
 function OO:OnFolioShown()
-    if not self.db.dockEnabled or not self.dock then return end
+    if not self.db.dockEnabled or not self.dockL then return end
     -- capture the live configID (it can change between sessions)
     pcall(function()
         if self.folioFrame and self.folioFrame.GetConfigID then
@@ -308,25 +326,29 @@ function OO:OnFolioShown()
             if id and id > 0 then self.folioConfigID = id end
         end
     end)
-    local d = self.dock.frame
-    d:ClearAllPoints()
-    -- Dock to the right edge of the folio. If it renders behind the folio in
-    -- testing, raise the strata in BuildDock.
-    d:SetPoint("TOPLEFT", self.folioFrame, "TOPRIGHT", 8, 0)
-    d:Show()
+    -- Embed: anchor the two panels INSIDE the folio's empty columns, flanking the
+    -- rune tree. Offsets are a first pass — tune here if they overlap the tree/title.
+    local lf, rf = self.dockL.frame, self.dockR.frame
+    lf:ClearAllPoints()
+    lf:SetPoint("TOPLEFT", self.folioFrame, "TOPLEFT", 28, -96)
+    rf:ClearAllPoints()
+    rf:SetPoint("TOPRIGHT", self.folioFrame, "TOPRIGHT", -28, -96)
+    lf:Show()
+    rf:Show()
     self:Refresh()
-    -- keep the reset timer / Mote count fresh while the folio is open
-    d:SetScript("OnUpdate", function(s, elapsed)
+    -- keep the reset timer / currency counts fresh while the folio is open
+    lf:SetScript("OnUpdate", function(s, elapsed)
         s._t = (s._t or 0) + elapsed
         if s._t > 5 then s._t = 0; OO:Refresh() end
     end)
 end
 
 function OO:OnFolioHidden()
-    if self.dock then
-        self.dock.frame:SetScript("OnUpdate", nil)
-        self.dock.frame:Hide()
+    if self.dockL then
+        self.dockL.frame:SetScript("OnUpdate", nil)
+        self.dockL.frame:Hide()
     end
+    if self.dockR then self.dockR.frame:Hide() end
 end
 
 -- Shared content builder — both panels render the same line list.
@@ -385,13 +407,67 @@ function OO:BuildLines()
     return lines
 end
 
-function OO:Refresh()
-    local lines = self:BuildLines()
-    if self.panel and self.frame and self.frame:IsShown() then
-        self:RenderLines(self.panel, lines)
+-- Left embedded panel: this week's folio progress + reset countdown.
+function OO:BuildLeftLines()
+    local weeks = self:GetWeeks()
+    local ws    = self:GetWeeklyState()
+    local reset = self:GetResetSeconds()
+    local lines = {}
+
+    if weeks.allDone then
+        lines[#lines + 1] = "|c" .. PALETTE.gold .. "Omnium Folio: |cFF66FF66COMPLETE|r"
+    else
+        lines[#lines + 1] = string.format(
+            "|c" .. PALETTE.gold .. "Omnium Folio|r  |cFFFFFFFF%d|r|c" .. PALETTE.dim .. "/5 weeks|r", weeks.unlocked)
     end
-    if self.dock and self.dock.frame:IsShown() then
-        self:RenderLines(self.dock, lines)
+    lines[#lines + 1] = "sep"
+
+    for _, step in ipairs(weeks.steps) do
+        lines[#lines + 1] = string.format("%s |cFFCCCCCC%s|r", Check(step.done), step.name)
+    end
+
+    lines[#lines + 1] = "sep"
+    if ws.allDone then
+        lines[#lines + 1] = "|cFF66FF66Folio fully unlocked!|r"
+    elseif ws.inLog then
+        lines[#lines + 1] = string.format("|cFFFFDD88This week: %s — in progress|r", ws.name)
+    elseif ws.nextReset then
+        lines[#lines + 1] = string.format("|c" .. PALETTE.dim .. "Next: %s (next reset)|r", ws.name)
+    else
+        lines[#lines + 1] = string.format("|c" .. PALETTE.dim .. "Start: %s (Silvermoon)|r", ws.name)
+    end
+    if reset then
+        lines[#lines + 1] = string.format(
+            "|c" .. PALETTE.dim .. "Weekly reset in|r |cFFFFFFFF%s|r", FmtDur(reset))
+    end
+    return lines
+end
+
+-- Right embedded panel: Voidstorm currencies + orbs.
+-- (Ascendant Voidcores / Voidshard are items, not currencies — pending item IDs.)
+function OO:BuildRightLines()
+    local lines = {}
+    local motes = self:GetMotes()
+    lines[#lines + 1] = string.format(
+        "|c" .. PALETTE.gold .. "Motes:|r |cFFFFFFFF%s|r", motes and tostring(motes) or "—")
+    local neb = self:GetCurrency(NEBULOUS_VOIDCORE)
+    lines[#lines + 1] = string.format(
+        "|c" .. PALETTE.purple .. "Bonus rolls:|r |cFFFFFFFF%s|r |c" .. PALETTE.dim .. "(Nebulous)|r", neb and tostring(neb) or "—")
+    local orbs = self:GetVoidOrbs()
+    lines[#lines + 1] = string.format(
+        "|c" .. PALETTE.purple .. "Void-Touched Orbs:|r |cFFFFFFFF%s|r|c" .. PALETTE.dim .. "/5|r", orbs and tostring(orbs) or "0")
+    return lines
+end
+
+function OO:Refresh()
+    if self.panel and self.frame and self.frame:IsShown() then
+        self:RenderLines(self.panel, self:BuildLines())
+    end
+    if self.dockL and self.dockL.frame:IsShown() then
+        self:RenderLines(self.dockL, self:BuildLeftLines())
+    end
+    if self.dockR and self.dockR.frame:IsShown() then
+        self:RenderLines(self.dockR, self:BuildRightLines())
     end
 end
 
@@ -562,7 +638,7 @@ SlashCmdList["OMNIUMOBSERVATOR"] = function(msg)
     elseif cmd == "dock" then
         OO.db.dockEnabled = not OO.db.dockEnabled
         print("|cFFFFCC00OmniumObservator|r folio dock " .. (OO.db.dockEnabled and "|cFF66FF66enabled|r" or "|cFFFF6666disabled|r"))
-        if not OO.db.dockEnabled and OO.dock then
+        if not OO.db.dockEnabled and OO.dockL then
             OO:OnFolioHidden()
         elseif OO.db.dockEnabled and OO.folioFrame and OO.folioFrame:IsShown() then
             OO:OnFolioShown()
