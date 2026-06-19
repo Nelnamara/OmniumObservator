@@ -204,6 +204,39 @@ function OO:GetItem(id)
     return n
 end
 
+-- Inline texture escape for a fileID (real game icon in a font string).
+local function IconTag(fid, sz)
+    if not fid then return "" end
+    sz = sz or 14
+    return string.format("|T%s:%d:%d:0:0|t ", tostring(fid), sz, sz)
+end
+
+function OO:CurrencyIcon(id)
+    local fid
+    pcall(function()
+        local i = C_CurrencyInfo and C_CurrencyInfo.GetCurrencyInfo and C_CurrencyInfo.GetCurrencyInfo(id)
+        if i then fid = i.iconFileID end
+    end)
+    return fid
+end
+
+function OO:ItemIcon(id)
+    local fid
+    pcall(function()
+        if C_Item and C_Item.GetItemIconByID then fid = C_Item.GetItemIconByID(id)
+        elseif GetItemIcon then fid = GetItemIcon(id) end
+    end)
+    return fid
+end
+
+function OO:SpellIcon(id)
+    local fid
+    pcall(function()
+        if C_Spell and C_Spell.GetSpellTexture then fid = C_Spell.GetSpellTexture(id) end
+    end)
+    return fid
+end
+
 local ROW_H   = 18
 local FRAME_W = 265
 local TITLE_H = 22
@@ -214,7 +247,8 @@ local PAD     = 6
 -- Shared by the standalone panel and the two embedded folio panels.
 function OO:CreatePanel(name, strata, titleText, showLogo)
     local f = CreateFrame("Frame", name, UIParent, "BackdropTemplate")
-    f:SetSize(FRAME_W, TITLE_H + ROW_H * 9 + PAD * 2)
+    local headerH = showLogo and 46 or TITLE_H
+    f:SetSize(FRAME_W, headerH + ROW_H * 9 + PAD * 2)
     f:SetFrameStrata(strata or "MEDIUM")
     f:SetClampedToScreen(true)
     f:SetBackdrop({
@@ -226,13 +260,14 @@ function OO:CreatePanel(name, strata, titleText, showLogo)
     f:SetBackdropColor(unpack(PALETTE.bg))
     f:SetBackdropBorderColor(unpack(PALETTE.border))
 
-    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local title = f:CreateFontString(nil, "OVERLAY", showLogo and "GameFontNormal" or "GameFontNormalSmall")
     if showLogo then
+        -- Larger mascot portrait (the high-res CurseForge art) in the header.
         local logo = f:CreateTexture(nil, "ARTWORK")
-        logo:SetSize(16, 16)
-        logo:SetPoint("TOPLEFT", f, "TOPLEFT", PAD, -3)
-        logo:SetTexture("Interface\\AddOns\\OmniumObservator\\Media\\icon.png")
-        title:SetPoint("LEFT", logo, "RIGHT", 4, 0)
+        logo:SetSize(38, 38)
+        logo:SetPoint("TOPLEFT", f, "TOPLEFT", PAD, -4)
+        logo:SetTexture("Interface\\AddOns\\OmniumObservator\\Media\\mascot.png")
+        title:SetPoint("LEFT", logo, "RIGHT", 6, 0)
     else
         title:SetPoint("TOPLEFT", f, "TOPLEFT", PAD + 2, -5)
     end
@@ -240,13 +275,13 @@ function OO:CreatePanel(name, strata, titleText, showLogo)
 
     local divider = f:CreateTexture(nil, "BACKGROUND")
     divider:SetSize(FRAME_W - 16, 1)
-    divider:SetPoint("TOP", f, "TOP", 0, -(TITLE_H - 2))
+    divider:SetPoint("TOP", f, "TOP", 0, -(headerH - 2))
     divider:SetColorTexture(1.0, 0.82, 0.0, 0.5)
 
-    local panel = { frame = f, linePool = {}, sepPool = {} }
+    local panel = { frame = f, linePool = {}, sepPool = {}, headerH = headerH }
     for i = 1, 20 do
         local fs = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-        fs:SetPoint("TOPLEFT", f, "TOPLEFT", PAD + 2, -(TITLE_H + (i - 1) * ROW_H + 4))
+        fs:SetPoint("TOPLEFT", f, "TOPLEFT", PAD + 2, -(headerH + (i - 1) * ROW_H + 4))
         fs:SetWidth(FRAME_W - PAD * 2 - 4)
         fs:SetJustifyH("LEFT")
         fs:SetWordWrap(false)
@@ -448,15 +483,18 @@ function OO:BuildRightLines()
         "|c" .. PALETTE.gold .. "Motes:|r |cFFFFFFFF%s|r", motes and tostring(motes) or "—")
     local neb = self:GetCurrency(NEBULOUS_VOIDCORE)
     lines[#lines + 1] = string.format(
-        "|c" .. PALETTE.purple .. "Bonus rolls:|r |cFFFFFFFF%s|r |c" .. PALETTE.dim .. "(Nebulous)|r", neb and tostring(neb) or "—")
+        "%s|c" .. PALETTE.purple .. "Bonus rolls:|r |cFFFFFFFF%s|r |c" .. PALETTE.dim .. "(Nebulous)|r",
+        IconTag(self:CurrencyIcon(NEBULOUS_VOIDCORE)), neb and tostring(neb) or "—")
 
     lines[#lines + 1] = "sep"
     local cores = self:GetItem(ITEM_ASCENDANT_VOIDCORE)
     lines[#lines + 1] = string.format(
-        "|c" .. PALETTE.purple .. "Ascendant Voidcores:|r |cFFFFFFFF%s|r", cores and tostring(cores) or "0")
+        "%s|c" .. PALETTE.purple .. "Ascendant Voidcores:|r |cFFFFFFFF%s|r",
+        IconTag(self:ItemIcon(ITEM_ASCENDANT_VOIDCORE)), cores and tostring(cores) or "0")
     local shards = self:GetItem(ITEM_ASCENDANT_VOIDSHARD)
     lines[#lines + 1] = string.format(
-        "|c" .. PALETTE.purple .. "Ascendant Voidshard:|r |cFFFFFFFF%s|r", shards and tostring(shards) or "0")
+        "%s|c" .. PALETTE.purple .. "Ascendant Voidshard:|r |cFFFFFFFF%s|r",
+        IconTag(self:ItemIcon(ITEM_ASCENDANT_VOIDSHARD)), shards and tostring(shards) or "0")
 
     -- Void-Touched Orbs: only shown when the rune is actually active (its aura is
     -- present = you're specced into it). When the slotted-rune readout lands this
@@ -465,7 +503,8 @@ function OO:BuildRightLines()
     if orbs then
         lines[#lines + 1] = "sep"
         lines[#lines + 1] = string.format(
-            "|c" .. PALETTE.purple .. "Void-Touched Orbs:|r |cFFFFFFFF%d|r|c" .. PALETTE.dim .. "/5|r", orbs)
+            "%s|c" .. PALETTE.purple .. "Void-Touched Orbs:|r |cFFFFFFFF%d|r|c" .. PALETTE.dim .. "/5|r",
+            IconTag(self:SpellIcon(RUNE_VOID_ORBS)), orbs)
     end
     return lines
 end
@@ -484,6 +523,7 @@ end
 
 function OO:RenderLines(panel, lines)
     local frame   = panel.frame
+    local headerH = panel.headerH or TITLE_H
     local sepIdx  = 1
     local lineIdx = 0
     local yOff    = 0
@@ -493,7 +533,7 @@ function OO:RenderLines(panel, lines)
             local sep = panel.sepPool[sepIdx]
             if sep then
                 sep:ClearAllPoints()
-                sep:SetPoint("TOPLEFT", frame, "TOPLEFT", PAD + 4, -(TITLE_H + yOff + ROW_H / 2))
+                sep:SetPoint("TOPLEFT", frame, "TOPLEFT", PAD + 4, -(headerH + yOff + ROW_H / 2))
                 sep:Show()
                 sepIdx = sepIdx + 1
                 yOff = yOff + ROW_H / 2
@@ -503,7 +543,7 @@ function OO:RenderLines(panel, lines)
             local fs = panel.linePool[lineIdx]
             if fs then
                 fs:ClearAllPoints()
-                fs:SetPoint("TOPLEFT", frame, "TOPLEFT", PAD + 2, -(TITLE_H + yOff + 4))
+                fs:SetPoint("TOPLEFT", frame, "TOPLEFT", PAD + 2, -(headerH + yOff + 4))
                 fs:SetText(entry)
                 fs:Show()
                 yOff = yOff + ROW_H
@@ -514,7 +554,7 @@ function OO:RenderLines(panel, lines)
     for i = lineIdx + 1, #panel.linePool do panel.linePool[i]:Hide() end
     for i = sepIdx, #panel.sepPool do panel.sepPool[i]:Hide() end
 
-    frame:SetHeight(TITLE_H + yOff + PAD * 2)
+    frame:SetHeight(headerH + yOff + PAD * 2)
 end
 
 function OO:SavePosition()
