@@ -81,6 +81,16 @@ local DECIMUS_RARE = {
     "Steal the Mantle of Predation, enter a Nexus-Point, and weaken the storm. Terminas will be humiliated.",
 }
 
+-- Recommended Omnium Folio rune build (Method.gg, general best). Spell IDs from
+-- the in-game rune set. The "Counsel" panel renders these with their real icons.
+local RUNE_GUIDE = {
+    { tier = "Core",      name = "Unleashed Fire",    id = 1279599, note = "best overall" },
+    { tier = "Defensive", name = "Void-Tainted Shell", id = 1279604, note = "shields save you" },
+    { tier = "Lingering", name = "Lingering",         id = 1287555, note = "only option" },
+    { tier = "Stat",      name = "sim your spec",      id = nil,     note = "stat-weighted" },
+    { tier = "Capstone",  name = "Overload",           id = 1279614, note = "best in most" },
+}
+
 local CHECK_DONE = "|TInterface\\RaidFrame\\ReadyCheck-Ready:0|t"
 local function Check(done)
     if done then return CHECK_DONE end
@@ -359,10 +369,13 @@ function OO:BuildDock()
     if self.dockL then return end
     self.dockL = self:CreatePanel("OODockLeft",  "HIGH", "|c" .. PALETTE.title .. "OmniumObservator|r", true)
     self.dockR = self:CreatePanel("OODockRight", "HIGH", "|c" .. PALETTE.title .. "Voidstorm|r", false)
+    self.dockGuide = self:CreatePanel("OODockGuide", "HIGH", "|c" .. PALETTE.title .. "Decimus's Counsel|r", false)
     self:MakeDockDraggable(self.dockL, "dockLPos")
     self:MakeDockDraggable(self.dockR, "dockRPos")
+    self:MakeDockDraggable(self.dockGuide, "dockGuidePos")
     self.dockL.frame:Hide()
     self.dockR.frame:Hide()
+    self.dockGuide.frame:Hide()
 end
 
 -- Drag a folio panel and remember where it was dropped (offset from the folio's
@@ -454,6 +467,13 @@ function OO:OnFolioShown()
     else rf:SetPoint("TOPRIGHT", folio, "TOPRIGHT", -28, -96) end
     lf:Show()
     rf:Show()
+    -- Optional "Decimus's Counsel" rune-guide panel (left, below the This-week panel)
+    local gf = self.dockGuide.frame
+    gf:ClearAllPoints()
+    local gp = self.db.dockGuidePos
+    if gp then gf:SetPoint("TOPLEFT", folio, "TOPLEFT", gp.x, gp.y)
+    else gf:SetPoint("TOPLEFT", folio, "TOPLEFT", 28, -300) end
+    gf:SetShown(self.db.showGuide == true)
     -- The embed is the single source of info while the folio is open — hide the
     -- standalone panel (if it was up) and restore it when the folio closes.
     if self.frame and self.frame:IsShown() then
@@ -480,6 +500,7 @@ function OO:OnFolioHidden()
         self.dockL.frame:Hide()
     end
     if self.dockR then self.dockR.frame:Hide() end
+    if self.dockGuide then self.dockGuide.frame:Hide() end
     if self.model then self.model:Hide() end
     if self._frameWasShown then
         self._frameWasShown = false
@@ -703,6 +724,19 @@ function OO:BuildRightLines()
     return lines
 end
 
+-- "Decimus's Counsel" — recommended rune build with real spell icons.
+function OO:BuildGuideLines()
+    local lines = {}
+    lines[#lines + 1] = "|c" .. PALETTE.gold .. "Recommended runes|r |c" .. PALETTE.dim .. "(Method.gg)|r"
+    lines[#lines + 1] = "sep"
+    for _, r in ipairs(RUNE_GUIDE) do
+        local icon = r.id and IconTag(self:SpellIcon(r.id)) or ""
+        lines[#lines + 1] = string.format("%s|c" .. PALETTE.purple .. "%s:|r |cFFFFFFFF%s|r",
+            icon, r.tier, r.name)
+    end
+    return lines
+end
+
 function OO:Refresh()
     if self.panel and self.frame and self.frame:IsShown() then
         self:RenderLines(self.panel, self:BuildLines())
@@ -712,6 +746,9 @@ function OO:Refresh()
     end
     if self.dockR and self.dockR.frame:IsShown() then
         self:RenderLines(self.dockR, self:BuildRightLines())
+    end
+    if self.dockGuide and self.dockGuide.frame:IsShown() then
+        self:RenderLines(self.dockGuide, self:BuildGuideLines())
     end
 end
 
@@ -776,6 +813,7 @@ function OO:ApplyAppearance()
     apply(self.panel)
     apply(self.dockL)
     apply(self.dockR)
+    apply(self.dockGuide)
     if self.frame then self.frame:SetScale(sc) end
 end
 
@@ -815,7 +853,7 @@ end
 function OO:BuildConfig()
     if self.config then self.config:Show(); return end
     local f = CreateFrame("Frame", "OOConfigFrame", UIParent, "BackdropTemplate")
-    f:SetSize(290, 308)
+    f:SetSize(310, 336)
     f:SetPoint("CENTER")
     f:SetFrameStrata("DIALOG")
     f:SetToplevel(true)
@@ -860,11 +898,15 @@ function OO:BuildConfig()
         OO.db.showModel = v
         if OO.folioFrame and OO.folioFrame:IsShown() then OO:UpdateModel() end
     end)
-    OOConfigCheck(f, "Body watermark", 28, -214, self.db.watermark ~= false, function(v)
+    OOConfigCheck(f, "Show rune guide (Decimus's Counsel)", 28, -214, self.db.showGuide, function(v)
+        OO.db.showGuide = v
+        if OO.folioFrame and OO.folioFrame:IsShown() then OO:OnFolioShown() end
+    end)
+    OOConfigCheck(f, "Body watermark", 28, -240, self.db.watermark ~= false, function(v)
         OO.db.watermark = v
         OO:ApplyAppearance()
     end)
-    OOConfigCheck(f, "Show minimap button", 28, -240, not self.db.minimapHide, function(v)
+    OOConfigCheck(f, "Show minimap button", 28, -266, not self.db.minimapHide, function(v)
         OO.db.minimapHide = not v
         if OO.minimapBtn then OO.minimapBtn:SetShown(v) end
     end)
