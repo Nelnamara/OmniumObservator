@@ -81,6 +81,10 @@ local DECIMUS_RARE = {
     "Steal the Mantle of Predation, enter a Nexus-Point, and weaken the storm. Terminas will be humiliated.",
 }
 
+-- Decimus voice-over FileDataIDs (Wowhead sound=NNNNN -> playable via PlaySoundFile).
+-- Pattern: VO_120_Decimus_NN_M. Add more IDs from Wowhead's Decimus "Sounds" tab.
+local DECIMUS_SOUNDS = { 327617 }
+
 -- Recommended Omnium Folio rune build (Method.gg, general best). Spell IDs from
 -- the in-game rune set. The "Counsel" panel renders these with their real icons.
 local RUNE_GUIDE = {
@@ -637,6 +641,10 @@ function OO:DecimusSpeak(rare)
     m.bubble:SetBackdropBorderColor(rare and 0.85 or PALETTE.border[1], rare and 0.20 or PALETTE.border[2], rare and 1.0 or PALETTE.border[3], 1)
     m.bubble:Show()
     pcall(function() m:SetAnimation(rare and 64 or 60) end)
+    -- Play his actual voice-over (FileDataID via PlaySoundFile), if enabled.
+    if self.db.decimusVoice ~= false and PlaySoundFile and #DECIMUS_SOUNDS > 0 then
+        pcall(function() PlaySoundFile(DECIMUS_SOUNDS[math.random(#DECIMUS_SOUNDS)], "Dialog") end)
+    end
     if self._speakTimer then self._speakTimer:Cancel() end
     self._speakTimer = C_Timer.NewTimer(rare and 8 or 5, function()
         if m.bubble then m.bubble:Hide() end
@@ -884,7 +892,7 @@ end
 function OO:BuildConfig()
     if self.config then self.config:Show(); return end
     local f = CreateFrame("Frame", "OOConfigFrame", UIParent, "BackdropTemplate")
-    f:SetSize(310, 336)
+    f:SetSize(310, 362)
     f:SetPoint("CENTER")
     f:SetFrameStrata("DIALOG")
     f:SetToplevel(true)
@@ -929,15 +937,18 @@ function OO:BuildConfig()
         OO.db.showModel = v
         if OO.folioFrame and OO.folioFrame:IsShown() then OO:UpdateModel() end
     end)
-    OOConfigCheck(f, "Show rune guide (Decimus's Counsel)", 28, -214, self.db.showGuide, function(v)
+    OOConfigCheck(f, "Decimus voice (plays his lines)", 28, -214, self.db.decimusVoice ~= false, function(v)
+        OO.db.decimusVoice = v
+    end)
+    OOConfigCheck(f, "Show rune guide (Decimus's Counsel)", 28, -240, self.db.showGuide, function(v)
         OO.db.showGuide = v
         if OO.folioFrame and OO.folioFrame:IsShown() then OO:OnFolioShown() end
     end)
-    OOConfigCheck(f, "Body watermark", 28, -240, self.db.watermark ~= false, function(v)
+    OOConfigCheck(f, "Body watermark", 28, -266, self.db.watermark ~= false, function(v)
         OO.db.watermark = v
         OO:ApplyAppearance()
     end)
-    OOConfigCheck(f, "Show minimap button", 28, -266, not self.db.minimapHide, function(v)
+    OOConfigCheck(f, "Show minimap button", 28, -292, not self.db.minimapHide, function(v)
         OO.db.minimapHide = not v
         if OO.minimapBtn then OO.minimapBtn:SetShown(v) end
     end)
@@ -1154,6 +1165,22 @@ SlashCmdList["OMNIUMOBSERVATOR"] = function(msg)
             OO.db.showModel = not OO.db.showModel
             OO:UpdateModel()
             print("|cFFFFCC00OmniumObservator|r Decimus model " .. (OO.db.showModel and "on (open folio: drag to rotate, scroll to zoom)" or "off"))
+        end
+    elseif cmd == "voice" then
+        local id = tonumber(arg)
+        if id then
+            local willPlay = false
+            pcall(function() willPlay = PlaySoundFile(id, "Dialog") end)
+            print(string.format("|cFFFFCC00OmniumObservator|r sound %d willPlay=%s", id, tostring(willPlay)))
+            if willPlay then
+                local exists = false
+                for _, s in ipairs(DECIMUS_SOUNDS) do if s == id then exists = true end end
+                if not exists then DECIMUS_SOUNDS[#DECIMUS_SOUNDS + 1] = id end
+                print("  added to Decimus's voice rotation (" .. #DECIMUS_SOUNDS .. " lines)")
+            end
+        else
+            OO.db.decimusVoice = (OO.db.decimusVoice == false)
+            print("|cFFFFCC00OmniumObservator|r Decimus voice " .. (OO.db.decimusVoice ~= false and "on" or "off"))
         end
     elseif cmd == "lock" then
         OO.db.locked = true
