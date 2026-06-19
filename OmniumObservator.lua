@@ -358,6 +358,7 @@ function OO:OnFolioShown()
         self._frameWasShown = true
         self.frame:Hide()
     end
+    self:ApplyAppearance()
     self:Refresh()
     -- keep the reset timer / currency counts fresh while the folio is open
     lf:SetScript("OnUpdate", function(s, elapsed)
@@ -562,6 +563,90 @@ function OO:SavePosition()
     end
 end
 
+-- Push saved opacity/scale onto the standalone panel and the two embedded panels.
+function OO:ApplyAppearance()
+    local a  = self.db.alpha or 0.9
+    local sc = self.db.scale or 1.0
+    if self.frame then self.frame:SetAlpha(a); self.frame:SetScale(sc) end
+    if self.dockL then self.dockL.frame:SetAlpha(a) end
+    if self.dockR then self.dockR.frame:SetAlpha(a) end
+end
+
+local function OOConfigCheck(parent, label, x, y, checked, onClick)
+    local cb = CreateFrame("CheckButton", nil, parent, "UICheckButtonTemplate")
+    cb:SetSize(22, 22)
+    cb:SetPoint("TOPLEFT", parent, "TOPLEFT", x, y)
+    cb:SetChecked(checked)
+    local t = cb:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    t:SetPoint("LEFT", cb, "RIGHT", 2, 0)
+    t:SetText(label)
+    cb:SetScript("OnClick", function(s) onClick(s:GetChecked() and true or false) end)
+    return cb
+end
+
+local function OOConfigSlider(parent, name, label, lowTxt, highTxt, lo, hi, val, y, onChange)
+    local s = CreateFrame("Slider", name, parent, "OptionsSliderTemplate")
+    s:SetWidth(230)
+    s:SetPoint("TOP", 0, y)
+    s:SetMinMaxValues(lo, hi)
+    s:SetValueStep(0.05)
+    s:SetObeyStepOnDrag(true)
+    s:SetValue(val)
+    _G[name .. "Low"]:SetText(lowTxt)
+    _G[name .. "High"]:SetText(highTxt)
+    _G[name .. "Text"]:SetText(label)
+    s:SetScript("OnValueChanged", function(_, v) onChange(v) end)
+    return s
+end
+
+-- Simple options panel (no Ace): opacity, scale, lock, dock + minimap toggles.
+function OO:BuildConfig()
+    if self.config then self.config:Show(); return end
+    local f = CreateFrame("Frame", "OOConfigFrame", UIParent, "BackdropTemplate")
+    f:SetSize(290, 250)
+    f:SetPoint("CENTER")
+    f:SetFrameStrata("DIALOG")
+    f:SetMovable(true)
+    f:EnableMouse(true)
+    f:RegisterForDrag("LeftButton")
+    f:SetClampedToScreen(true)
+    f:SetScript("OnDragStart", f.StartMoving)
+    f:SetScript("OnDragStop", f.StopMovingOrSizing)
+    f:SetBackdrop({
+        bgFile   = "Interface\\Buttons\\WHITE8x8",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        tile = false, edgeSize = 12,
+        insets = { left = 3, right = 3, top = 3, bottom = 3 },
+    })
+    f:SetBackdropColor(unpack(PALETTE.bg))
+    f:SetBackdropBorderColor(unpack(PALETTE.border))
+
+    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    title:SetPoint("TOP", 0, -10)
+    title:SetText("|c" .. PALETTE.title .. "OmniumObservator|r options")
+
+    local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
+    close:SetPoint("TOPRIGHT", 2, 2)
+
+    OOConfigSlider(f, "OOConfigOpacity", "Opacity", "30%", "100%", 0.3, 1.0, self.db.alpha or 0.9, -52,
+        function(v) OO.db.alpha = v; OO:ApplyAppearance() end)
+    OOConfigSlider(f, "OOConfigScale", "Scale (standalone)", "70%", "150%", 0.7, 1.5, self.db.scale or 1.0, -98,
+        function(v) OO.db.scale = v; OO:ApplyAppearance() end)
+
+    OOConfigCheck(f, "Lock position", 28, -136, self.db.locked, function(v) OO.db.locked = v end)
+    OOConfigCheck(f, "Folio dock enabled", 28, -164, self.db.dockEnabled, function(v)
+        OO.db.dockEnabled = v
+        if not v then OO:OnFolioHidden()
+        elseif OO.folioFrame and OO.folioFrame:IsShown() then OO:OnFolioShown() end
+    end)
+    OOConfigCheck(f, "Show minimap button", 28, -192, not self.db.minimapHide, function(v)
+        OO.db.minimapHide = not v
+        if OO.minimapBtn then OO.minimapBtn:SetShown(v) end
+    end)
+
+    self.config = f
+end
+
 -- Minimap button — left-click toggles the panel, right-click dumps state, drag repositions.
 local MM_RADIUS = 80
 local function OOAngleOffset(a)
@@ -756,6 +841,8 @@ SlashCmdList["OMNIUMOBSERVATOR"] = function(msg)
             print(string.format("    Quest %d (wk%d): completed=%s",
                 q.id, q.week, tostring(C_QuestLog.IsQuestFlaggedCompleted(q.id))))
         end
+    elseif cmd == "config" or cmd == "options" then
+        OO:BuildConfig()
     elseif cmd == "lock" then
         OO.db.locked = true
         print("|cFFFFCC00OmniumObservator|r locked.")
