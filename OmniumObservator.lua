@@ -359,6 +359,7 @@ function OO:BuildUI()
     frame:Show()
     self.panel = panel
     self.frame = frame
+    self:AddCollapseButton(panel)
     self:ApplyAppearance()
 end
 
@@ -373,6 +374,7 @@ function OO:BuildDock()
     self:MakeDockDraggable(self.dockL, "dockLPos")
     self:MakeDockDraggable(self.dockR, "dockRPos")
     self:MakeDockDraggable(self.dockGuide, "dockGuidePos")
+    self:AddCollapseButton(self.dockL)
     self.dockL.frame:Hide()
     self.dockR.frame:Hide()
     self.dockGuide.frame:Hide()
@@ -403,6 +405,30 @@ function OO:SaveDockPos(panel, key)
         f:ClearAllPoints()
         f:SetPoint("TOPLEFT", folio, "TOPLEFT", dx, dy)
     end
+end
+
+-- A small [+]/[-] in the header that collapses/expands the weekly list.
+function OO:AddCollapseButton(panel)
+    local b = CreateFrame("Button", nil, panel.frame)
+    b:SetSize(20, 20)
+    b:SetPoint("TOPRIGHT", panel.frame, "TOPRIGHT", -6, -3)
+    b:SetFrameLevel(panel.frame:GetFrameLevel() + 5)
+    local t = b:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    t:SetAllPoints()
+    t:SetText(OO.db.weeksCollapsed and "+" or "-")
+    b.text = t
+    b:SetScript("OnClick", function()
+        OO.db.weeksCollapsed = not OO.db.weeksCollapsed
+        OO:UpdateCollapseButtons()
+        OO:Refresh()
+    end)
+    panel.collapseBtn = b
+end
+
+function OO:UpdateCollapseButtons()
+    local txt = OO.db.weeksCollapsed and "+" or "-"
+    if self.panel and self.panel.collapseBtn then self.panel.collapseBtn.text:SetText(txt) end
+    if self.dockL and self.dockL.collapseBtn then self.dockL.collapseBtn.text:SetText(txt) end
 end
 
 -- Locate the Omnium Folio frame (only present once Blizzard_ExpansionLandingPage
@@ -659,10 +685,15 @@ function OO:BuildLeftLines()
     lines[#lines + 1] = "sep"
 
     -- Each week shows its loot-rarity colour (the full ladder is visible); the
-    -- check vs bullet shows progress. Locked weeks are name-coloured but marked.
-    for i, step in ipairs(weeks.steps) do
-        local color = WEEK_COLORS[i] or "FFCCCCCC"
-        lines[#lines + 1] = string.format("%s |c%s%s|r", Check(step.done), color, step.name)
+    -- check vs bullet shows progress. Collapsible via the header [+]/[-] button.
+    if self.db.weeksCollapsed then
+        lines[#lines + 1] = string.format(
+            "|c" .. PALETTE.dim .. "%d/5 weeks — [ + ] to expand|r", weeks.unlocked)
+    else
+        for i, step in ipairs(weeks.steps) do
+            local color = WEEK_COLORS[i] or "FFCCCCCC"
+            lines[#lines + 1] = string.format("%s |c%s%s|r", Check(step.done), color, step.name)
+        end
     end
 
     lines[#lines + 1] = "sep"
