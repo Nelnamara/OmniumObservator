@@ -45,15 +45,17 @@ local NEBULOUS_VOIDCORE = 3418    -- bonus-roll currency (confirmed in-game via 
 local ITEM_ASCENDANT_VOIDCORE  = 268552  -- gear-upgrade item
 local ITEM_ASCENDANT_VOIDSHARD = 268650  -- collected, forged into a Voidcore
 local QUEST_FEEDING_NILHAMMER  = 95269   -- weekly: catalyze the Hungering Oblivium
+local NPC_DECIMUS              = 235697   -- Domanaar Decimus (for the 3D model)
 
--- Suite branding palette (purple / gold / black)
+-- Suite branding palette (void purple / gold accents / black)
 local PALETTE = {
     bg     = { 0.04, 0.02, 0.07, 0.92 },  -- near-black with a faint purple cast
-    border = { 1.00, 0.82, 0.00, 0.90 },  -- gold
+    border = { 0.64, 0.21, 0.93, 0.95 },  -- void purple (epic-rarity hue)
+    divider= { 0.55, 0.30, 0.90, 0.55 },  -- purple divider
     title  = "FFFFD200",                   -- gold (title text colour code)
     gold   = "FFFFD700",
-    purple = "FFBB66FF",
-    dim    = "FF888888",
+    purple = "FFC58CFF",
+    dim    = "FF8A8A8A",
 }
 
 -- The 5 weeks light up in WoW loot-rarity colours as they're unlocked:
@@ -204,11 +206,12 @@ function OO:GetItem(id)
     return n
 end
 
--- Inline texture escape for a fileID (real game icon in a font string).
+-- Inline texture escape for a fileID (real game icon in a font string). The
+-- :64:64 crop trims the default icon border so the art reads clearly at size.
 local function IconTag(fid, sz)
     if not fid then return "" end
-    sz = sz or 14
-    return string.format("|T%s:%d:%d:0:0|t ", tostring(fid), sz, sz)
+    sz = sz or 18
+    return string.format("|T%s:%d:%d:0:0:64:64:5:59:5:59|t ", tostring(fid), sz, sz)
 end
 
 function OO:CurrencyIcon(id)
@@ -238,7 +241,7 @@ function OO:SpellIcon(id)
 end
 
 local ROW_H   = 18
-local FRAME_W = 265
+local FRAME_W = 300
 local TITLE_H = 22
 local PAD     = 6
 
@@ -247,7 +250,7 @@ local PAD     = 6
 -- Shared by the standalone panel and the two embedded folio panels.
 function OO:CreatePanel(name, strata, titleText, showLogo)
     local f = CreateFrame("Frame", name, UIParent, "BackdropTemplate")
-    local headerH = showLogo and 46 or TITLE_H
+    local headerH = showLogo and 52 or TITLE_H
     f:SetSize(FRAME_W, headerH + ROW_H * 9 + PAD * 2)
     f:SetFrameStrata(strata or "MEDIUM")
     f:SetClampedToScreen(true)
@@ -260,14 +263,22 @@ function OO:CreatePanel(name, strata, titleText, showLogo)
     f:SetBackdropColor(unpack(PALETTE.bg))
     f:SetBackdropBorderColor(unpack(PALETTE.border))
 
-    local title = f:CreateFontString(nil, "OVERLAY", showLogo and "GameFontNormal" or "GameFontNormalSmall")
+    -- Faint mascot watermark embedded in the panel body (low alpha, corner).
+    local mark = f:CreateTexture(nil, "BACKGROUND", nil, 1)
+    mark:SetTexture("Interface\\AddOns\\OmniumObservator\\Media\\mascot.png")
+    mark:SetSize(96, 96)
+    mark:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -6, 6)
+    mark:SetAlpha(0.07)
+    f.watermark = mark
+
+    local title = f:CreateFontString(nil, "OVERLAY", showLogo and "GameFontNormalLarge" or "GameFontNormalSmall")
     if showLogo then
         -- Larger mascot portrait (the high-res CurseForge art) in the header.
         local logo = f:CreateTexture(nil, "ARTWORK")
-        logo:SetSize(38, 38)
+        logo:SetSize(44, 44)
         logo:SetPoint("TOPLEFT", f, "TOPLEFT", PAD, -4)
         logo:SetTexture("Interface\\AddOns\\OmniumObservator\\Media\\mascot.png")
-        title:SetPoint("LEFT", logo, "RIGHT", 6, 0)
+        title:SetPoint("LEFT", logo, "RIGHT", 7, 0)
     else
         title:SetPoint("TOPLEFT", f, "TOPLEFT", PAD + 2, -5)
     end
@@ -276,7 +287,7 @@ function OO:CreatePanel(name, strata, titleText, showLogo)
     local divider = f:CreateTexture(nil, "BACKGROUND")
     divider:SetSize(FRAME_W - 16, 1)
     divider:SetPoint("TOP", f, "TOP", 0, -(headerH - 2))
-    divider:SetColorTexture(1.0, 0.82, 0.0, 0.5)
+    divider:SetColorTexture(PALETTE.divider[1], PALETTE.divider[2], PALETTE.divider[3], PALETTE.divider[4])
 
     local panel = { frame = f, linePool = {}, sepPool = {}, headerH = headerH }
     for i = 1, 20 do
@@ -291,7 +302,7 @@ function OO:CreatePanel(name, strata, titleText, showLogo)
     for i = 1, 8 do
         local sep = f:CreateTexture(nil, "BACKGROUND")
         sep:SetSize(FRAME_W - 20, 1)
-        sep:SetColorTexture(0.60, 0.50, 0.10, 0.4)
+        sep:SetColorTexture(0.45, 0.25, 0.75, 0.45)
         sep:Hide()
         panel.sepPool[i] = sep
     end
@@ -305,7 +316,6 @@ function OO:BuildUI()
     local frame = panel.frame
     frame:SetPoint("CENTER", UIParent, "CENTER", db.x, db.y)
     frame:SetScale(db.scale)
-    frame:SetAlpha(db.alpha)
     frame:SetMovable(true)
     frame:EnableMouse(true)
 
@@ -321,13 +331,15 @@ function OO:BuildUI()
     frame:Show()
     self.panel = panel
     self.frame = frame
+    self:ApplyAppearance()
 end
 
 -- Lazily create the two embedded panels (anchored INSIDE the folio's empty
 -- columns when it opens). Parented to UIParent so we never taint the Traits frame.
+-- The left panel's title is the addon name (no version); the right is "Voidstorm".
 function OO:BuildDock()
     if self.dockL then return end
-    self.dockL = self:CreatePanel("OODockLeft",  "HIGH", "|c" .. PALETTE.title .. "This week|r", true)
+    self.dockL = self:CreatePanel("OODockLeft",  "HIGH", "|c" .. PALETTE.title .. "OmniumObservator|r", true)
     self.dockR = self:CreatePanel("OODockRight", "HIGH", "|c" .. PALETTE.title .. "Voidstorm|r", false)
     self:MakeDockDraggable(self.dockL, "dockLPos")
     self:MakeDockDraggable(self.dockR, "dockRPos")
@@ -432,6 +444,7 @@ function OO:OnFolioShown()
     end
     self:ApplyAppearance()
     self:Refresh()
+    self:UpdateModel()
     -- keep the reset timer / currency counts fresh while the folio is open
     lf:SetScript("OnUpdate", function(s, elapsed)
         s._t = (s._t or 0) + elapsed
@@ -445,10 +458,38 @@ function OO:OnFolioHidden()
         self.dockL.frame:Hide()
     end
     if self.dockR then self.dockR.frame:Hide() end
+    if self.model then self.model:Hide() end
     if self._frameWasShown then
         self._frameWasShown = false
         if self.frame then self.frame:Show() end
     end
+end
+
+-- Decimus 3D creature model in the folio's lower-left empty space (opt-in via
+-- config). Parented to UIParent + anchored to the folio so the Traits frame is
+-- never touched. Heavily guarded — a bad creature ID just shows nothing.
+function OO:UpdateModel(creatureOverride)
+    if not self.folioFrame then return end
+    if not self.db.showModel then
+        if self.model then self.model:Hide() end
+        return
+    end
+    if not self.model then
+        local m = CreateFrame("PlayerModel", "OODecimusModel", UIParent)
+        m:SetFrameStrata("HIGH")
+        m:SetSize(170, 250)
+        m:EnableMouse(false)
+        self.model = m
+    end
+    local m = self.model
+    m:ClearAllPoints()
+    m:SetPoint("BOTTOMLEFT", self.folioFrame, "BOTTOMLEFT", 36, 30)
+    pcall(function()
+        m:SetCreature(creatureOverride or NPC_DECIMUS)
+        m:SetPortraitZoom(0)
+        m:SetFacing(0.45)
+    end)
+    m:Show()
 end
 
 -- Standalone "detached" panel mirrors the embed: the left (weeks / tasks / reset)
@@ -598,13 +639,23 @@ function OO:SavePosition()
     end
 end
 
--- Push saved opacity/scale onto the standalone panel and the two embedded panels.
+-- Opacity now affects ONLY the panel background (and watermark), so text and
+-- icons stay fully crisp. Scale applies to the standalone panel.
 function OO:ApplyAppearance()
-    local a  = self.db.alpha or 0.9
-    local sc = self.db.scale or 1.0
-    if self.frame then self.frame:SetAlpha(a); self.frame:SetScale(sc) end
-    if self.dockL then self.dockL.frame:SetAlpha(a) end
-    if self.dockR then self.dockR.frame:SetAlpha(a) end
+    local bgA = self.db.alpha or 0.9
+    local sc  = self.db.scale or 1.0
+    local r, g, b = PALETTE.bg[1], PALETTE.bg[2], PALETTE.bg[3]
+    local wmOn = self.db.watermark ~= false
+    local function apply(p)
+        if not p or not p.frame then return end
+        p.frame:SetAlpha(1)
+        if p.frame.SetBackdropColor then p.frame:SetBackdropColor(r, g, b, bgA) end
+        if p.frame.watermark then p.frame.watermark:SetAlpha(wmOn and (0.07 * bgA) or 0) end
+    end
+    apply(self.panel)
+    apply(self.dockL)
+    apply(self.dockR)
+    if self.frame then self.frame:SetScale(sc) end
 end
 
 local function OOConfigCheck(parent, label, x, y, checked, onClick)
@@ -643,7 +694,7 @@ end
 function OO:BuildConfig()
     if self.config then self.config:Show(); return end
     local f = CreateFrame("Frame", "OOConfigFrame", UIParent, "BackdropTemplate")
-    f:SetSize(290, 250)
+    f:SetSize(290, 308)
     f:SetPoint("CENTER")
     f:SetFrameStrata("DIALOG")
     f:SetToplevel(true)
@@ -673,18 +724,26 @@ function OO:BuildConfig()
     close:SetPoint("TOPRIGHT", 2, 2)
     close:SetScript("OnClick", function() f:Hide() end)
 
-    OOConfigSlider(f, "OOConfigOpacity", "Opacity", "30%", "100%", 0.3, 1.0, self.db.alpha or 0.9, -52,
+    OOConfigSlider(f, "OOConfigOpacity", "Background opacity", "30%", "100%", 0.3, 1.0, self.db.alpha or 0.9, -52,
         function(v) OO.db.alpha = v; OO:ApplyAppearance() end)
     OOConfigSlider(f, "OOConfigScale", "Scale (standalone)", "70%", "150%", 0.7, 1.5, self.db.scale or 1.0, -98,
         function(v) OO.db.scale = v; OO:ApplyAppearance() end)
 
     OOConfigCheck(f, "Lock position", 28, -136, self.db.locked, function(v) OO.db.locked = v end)
-    OOConfigCheck(f, "Folio dock enabled", 28, -164, self.db.dockEnabled, function(v)
+    OOConfigCheck(f, "Folio dock enabled", 28, -162, self.db.dockEnabled, function(v)
         OO.db.dockEnabled = v
         if not v then OO:OnFolioHidden()
         elseif OO.folioFrame and OO.folioFrame:IsShown() then OO:OnFolioShown() end
     end)
-    OOConfigCheck(f, "Show minimap button", 28, -192, not self.db.minimapHide, function(v)
+    OOConfigCheck(f, "Show Decimus model", 28, -188, self.db.showModel, function(v)
+        OO.db.showModel = v
+        if OO.folioFrame and OO.folioFrame:IsShown() then OO:UpdateModel() end
+    end)
+    OOConfigCheck(f, "Body watermark", 28, -214, self.db.watermark ~= false, function(v)
+        OO.db.watermark = v
+        OO:ApplyAppearance()
+    end)
+    OOConfigCheck(f, "Show minimap button", 28, -240, not self.db.minimapHide, function(v)
         OO.db.minimapHide = not v
         if OO.minimapBtn then OO.minimapBtn:SetShown(v) end
     end)
@@ -720,7 +779,7 @@ function OO:BuildMinimapButton()
         GameTooltip:SetOwner(self, "ANCHOR_LEFT")
         GameTooltip:AddLine("|cFFFFCC00OmniumObservator|r " .. (OO.version or ""))
         GameTooltip:AddLine("Left-click: Toggle panel", 1, 1, 1)
-        GameTooltip:AddLine("Right-click: Dump state", 1, 1, 1)
+        GameTooltip:AddLine("Right-click: Options", 1, 1, 1)
         GameTooltip:AddLine("Drag: Reposition", 0.7, 0.7, 0.7)
         GameTooltip:AddLine("Tip: open the Omnium Folio to see the dock", 0.6, 0.9, 0.6)
         GameTooltip:Show()
@@ -729,7 +788,7 @@ function OO:BuildMinimapButton()
 
     btn:SetScript("OnClick", function(_, button)
         if button == "RightButton" then
-            SlashCmdList["OMNIUMOBSERVATOR"]("debug")
+            OO:BuildConfig()
         elseif OO.frame then
             OO.frame:SetShown(not OO.frame:IsShown())
         end
@@ -891,6 +950,17 @@ SlashCmdList["OMNIUMOBSERVATOR"] = function(msg)
         end
     elseif cmd == "config" or cmd == "options" then
         OO:BuildConfig()
+    elseif cmd == "model" then
+        local id = tonumber(arg)
+        if id then
+            OO.db.showModel = true
+            OO:UpdateModel(id)
+            print("|cFFFFCC00OmniumObservator|r model -> creature " .. id .. " (open the folio to see it)")
+        else
+            OO.db.showModel = not OO.db.showModel
+            OO:UpdateModel()
+            print("|cFFFFCC00OmniumObservator|r Decimus model " .. (OO.db.showModel and "on" or "off"))
+        end
     elseif cmd == "lock" then
         OO.db.locked = true
         print("|cFFFFCC00OmniumObservator|r locked.")
