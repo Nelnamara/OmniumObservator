@@ -352,6 +352,12 @@ function OO:OnFolioShown()
     rf:SetPoint("TOPRIGHT", self.folioFrame, "TOPRIGHT", -28, -96)
     lf:Show()
     rf:Show()
+    -- The embed is the single source of info while the folio is open — hide the
+    -- standalone panel (if it was up) and restore it when the folio closes.
+    if self.frame and self.frame:IsShown() then
+        self._frameWasShown = true
+        self.frame:Hide()
+    end
     self:Refresh()
     -- keep the reset timer / currency counts fresh while the folio is open
     lf:SetScript("OnUpdate", function(s, elapsed)
@@ -366,6 +372,10 @@ function OO:OnFolioHidden()
         self.dockL.frame:Hide()
     end
     if self.dockR then self.dockR.frame:Hide() end
+    if self._frameWasShown then
+        self._frameWasShown = false
+        if self.frame then self.frame:Show() end
+    end
 end
 
 -- Shared content builder — both panels render the same line list.
@@ -484,10 +494,15 @@ function OO:BuildRightLines()
     lines[#lines + 1] = string.format(
         "|c" .. PALETTE.purple .. "Ascendant Voidshard:|r |cFFFFFFFF%s|r", shards and tostring(shards) or "0")
 
-    lines[#lines + 1] = "sep"
+    -- Void-Touched Orbs: only shown when the rune is actually active (its aura is
+    -- present = you're specced into it). When the slotted-rune readout lands this
+    -- becomes "whichever resource rune you've chosen in the tree".
     local orbs = self:GetVoidOrbs()
-    lines[#lines + 1] = string.format(
-        "|c" .. PALETTE.purple .. "Void-Touched Orbs:|r |cFFFFFFFF%s|r|c" .. PALETTE.dim .. "/5|r", orbs and tostring(orbs) or "0")
+    if orbs then
+        lines[#lines + 1] = "sep"
+        lines[#lines + 1] = string.format(
+            "|c" .. PALETTE.purple .. "Void-Touched Orbs:|r |cFFFFFFFF%d|r|c" .. PALETTE.dim .. "/5|r", orbs)
+    end
     return lines
 end
 
@@ -690,6 +705,35 @@ SlashCmdList["OMNIUMOBSERVATOR"] = function(msg)
         end
         OO:ScheduleFolioHook()
         print("  -> hooked:", tostring(OO.folioHooked), "configID:", tostring(OO.folioConfigID))
+    elseif cmd == "runes" then
+        -- Dump the purchased folio tree nodes -> rune spell IDs. Feeds the future
+        -- "track whichever rune you've specced" readout. Open the folio once first.
+        if not OO.folioConfigID then
+            print("|cFFFFCC00OmniumObservator|r open the Omnium Folio once, then /oo runes")
+            return
+        end
+        print(string.format("|cFFFFCC00OmniumObservator|r folio runes (config %s, tree %d):",
+            tostring(OO.folioConfigID), FOLIO_TREE_ID))
+        local ok = pcall(function()
+            local nodes = C_Traits.GetTreeNodes(FOLIO_TREE_ID)
+            for _, nodeID in ipairs(nodes) do
+                local n = C_Traits.GetNodeInfo(OO.folioConfigID, nodeID)
+                if n and (n.ranksPurchased or 0) > 0 then
+                    local spellID, name
+                    local entryID = n.activeEntry and n.activeEntry.entryID
+                    if entryID then
+                        local e = C_Traits.GetEntryInfo(OO.folioConfigID, entryID)
+                        local def = e and e.definitionID and C_Traits.GetDefinitionInfo(e.definitionID)
+                        spellID = def and (def.overriddenSpellID or def.spellID)
+                        local si = spellID and C_Spell and C_Spell.GetSpellInfo and C_Spell.GetSpellInfo(spellID)
+                        name = si and si.name
+                    end
+                    print(string.format("  node %s x%d -> spell %s %s",
+                        tostring(nodeID), n.ranksPurchased, tostring(spellID), name or ""))
+                end
+            end
+        end)
+        if not ok then print("  (trait read failed)") end
     elseif cmd == "debug" then
         print("|cFFFFCC00OmniumObservator|r " .. OO.version)
         local _, achName, _, achDone = GetAchievementInfo(ACH_OMNIUM_FOLIO)
