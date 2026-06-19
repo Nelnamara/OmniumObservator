@@ -22,7 +22,9 @@ Pivot OO from a standalone panel into a companion docked to the folio (single po
 - Runes (slotted / empowered) are therefore readable via **`C_Traits`**.
 - **Motes of Omnial Inquiry are the trait-tree currency** (`C_Traits.GetTreeCurrencyInfo`), NOT a `C_CurrencyInfo` currency — that's why they don't show in the currency tab.
 - **Phase 1:** hook `RunesOfPowerFrame`'s OnShow, anchor a non-secure dock showing: weekly Seeking Knowledge line + next step, Mote count, weekly reset timer (`C_DateAndTime.GetSecondsUntilWeeklyReset`), week progress, and the live orb counter. Minimap button opens the folio. Refresh out of combat / on events; never taint the folio frame.
-- **Need (in-game):** folio `configID`/`treeID` — with the folio open: `/dump ExpansionLandingPage.Overlay.MidnightLandingOverlay.RunesOfPowerFrame:GetConfigID()` then `C_Traits.GetConfigInfo(<id>)`.
+- **CONFIRMED config (in-game):** `RunesOfPowerFrame:GetConfigID()` → a configID (e.g. `55669420` — read it **live**, it can change between sessions); `C_Traits.GetConfigInfo(configID).treeIDs[1]` = **`1186`** (the folio tree). Mote currency: `C_Traits.GetTreeCurrencyInfo(configID, 1186, false)[1]` → `{ quantity (unspent Motes), spent, maxQuantity, traitCurrencyID = 4230 }`.
+- **Rune spell IDs** (for the build-helper): Unleashed Fire `1279599`, Void-Touched Orbs `1279596`, Void-Tainted Shell `1279604`, Self-Mending `1279603`, Lynxlike Reflexes `1279605`, Lingering `1287555`, Overload `1279614`, Residual Energy `1279615`, Echoes `1279616`. Which are slotted: read `C_Traits` node/entry info on the tree.
+- **Orb counter CONFIRMED:** `C_UnitAuras.GetPlayerAuraBySpellID(1279596).applications` = live 0–5 orb count (verified in-game; not secret).
 
 ## Build / release / deploy
 - BigWigs packager on **`v*` tag push**. CurseForge secret: **`CURSFORGE_API_KEY`** (misspelled, leave as-is).
