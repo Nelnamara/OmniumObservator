@@ -63,6 +63,24 @@ local PALETTE = {
 local WEEK_COLORS = { "FFFFFFFF", "FF1EFF00", "FF0070DD", "FFA335EE", "FFFF8000" }
 local WEEK_DIM    = "FF555555"
 
+-- Decimus's in-game lines (verbatim from Wowhead) — he speaks one on folio open
+-- and when clicked. The rare set is reserved for the easter egg.
+local DECIMUS_QUOTES = {
+    "I am a creature of passion.",
+    "The cosmos is a feast, lightling. Why not enjoy it?",
+    "I need no master. We should all obey our own appetites.",
+    "Come, <name>. I have so much to show you.",
+    "Watching your struggles blaze bright against an uncaring cosmos -- it's delicious.",
+    "Make yourself at home. Then we can discuss weakening the storm.",
+    "Borrow my pet's sight. I'll tell you how to weaken the storm.",
+    "She would leave nothing but an empty abyss. Can you imagine anything more dull?",
+    "The key to weakening the storm is the Mantle of Predation.",
+}
+local DECIMUS_RARE = {
+    "Xal'atath would devour your world. All worlds. Even the stars.",
+    "Steal the Mantle of Predation, enter a Nexus-Point, and weaken the storm. Terminas will be humiliated.",
+}
+
 local CHECK_DONE = "|TInterface\\RaidFrame\\ReadyCheck-Ready:0|t"
 local function Check(done)
     if done then return CHECK_DONE end
@@ -181,15 +199,15 @@ function OO:GetResetSeconds()
     return s
 end
 
--- Generic currency quantity by ID (pcall-guarded). Used for Nebulous Voidcore etc.
+-- Currency quantity + weekly cap by ID (pcall-guarded). Used for Nebulous Voidcore.
 function OO:GetCurrency(id)
     if not (C_CurrencyInfo and C_CurrencyInfo.GetCurrencyInfo) then return nil end
-    local q
+    local q, m
     pcall(function()
         local info = C_CurrencyInfo.GetCurrencyInfo(id)
-        if info and info.quantity then q = info.quantity end
+        if info then q = info.quantity; m = info.maxQuantity end
     end)
-    return q
+    return q, m
 end
 
 -- Item count across bags + bank + reagent bank + warband bank (pcall-guarded).
@@ -445,6 +463,10 @@ function OO:OnFolioShown()
     self:ApplyAppearance()
     self:Refresh()
     self:UpdateModel()
+    -- let the model load, then Decimus greets you with a random line
+    if self.db.showModel and C_Timer then
+        C_Timer.After(0.8, function() OO:DecimusSpeak(false) end)
+    end
     -- keep the reset timer / currency counts fresh while the folio is open
     lf:SetScript("OnUpdate", function(s, elapsed)
         s._t = (s._t or 0) + elapsed
@@ -477,20 +499,49 @@ function OO:UpdateModel(creatureOverride)
     end
     if not self.model then
         local m = CreateFrame("PlayerModel", "OODecimusModel", UIParent)
-        m:SetFrameStrata("HIGH")
+        m:SetFrameStrata("FULLSCREEN_DIALOG")  -- floats over everything (movable)
         m:SetSize(190, 270)
+        m:SetMovable(true)
         m:EnableMouse(true)
         m:EnableMouseWheel(true)
+        m:RegisterForDrag("RightButton")
         m.facing, m.zoom = 0.45, 0
 
+        -- Speech bubble above his head.
+        local bubble = CreateFrame("Frame", nil, m, "BackdropTemplate")
+        bubble:SetPoint("BOTTOM", m, "TOP", 0, -2)
+        bubble:SetSize(200, 56)
+        bubble:SetBackdrop({
+            bgFile = "Interface\\Buttons\\WHITE8x8",
+            edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+            tile = false, edgeSize = 12, insets = { left = 4, right = 4, top = 4, bottom = 4 },
+        })
+        bubble:SetBackdropColor(0.05, 0.02, 0.10, 0.94)
+        bubble:SetBackdropBorderColor(unpack(PALETTE.border))
+        local bt = bubble:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        bt:SetPoint("TOPLEFT", 7, -6)
+        bt:SetPoint("BOTTOMRIGHT", -7, 6)
+        bt:SetJustifyH("LEFT")
+        bt:SetWordWrap(true)
+        bubble:Hide()
+        m.bubble, m.bubbleText = bubble, bt
+
+        -- Left = rotate (drag) / speak (click). Right-drag = move. Scroll = zoom.
         m:SetScript("OnMouseDown", function(s, btn)
-            if btn == "LeftButton" then s.rotating = true; s.lastX = GetCursorPosition() end
+            if btn == "LeftButton" then s.rotating = true; s.moved = false; s.lastX = GetCursorPosition() end
         end)
-        m:SetScript("OnMouseUp", function(s) s.rotating = false end)
+        m:SetScript("OnMouseUp", function(s, btn)
+            if btn == "LeftButton" then
+                s.rotating = false
+                if not s.moved then OO:DecimusClicked() end
+            end
+        end)
         m:SetScript("OnUpdate", function(s)
             if s.rotating then
                 local x = GetCursorPosition()
-                s.facing = (s.facing or 0) + (x - (s.lastX or x)) * 0.012
+                local dx = x - (s.lastX or x)
+                if math.abs(dx) > 1 then s.moved = true end
+                s.facing = (s.facing or 0) + dx * 0.012
                 s.lastX = x
                 pcall(function() s:SetFacing(s.facing) end)
             end
@@ -499,7 +550,8 @@ function OO:UpdateModel(creatureOverride)
             s.zoom = math.max(0, math.min(0.9, (s.zoom or 0) + delta * 0.1))
             pcall(function() s:SetPortraitZoom(s.zoom) end)
         end)
-        -- Reset framing whenever the model finishes (re)loading.
+        m:SetScript("OnDragStart", function(s) s:StartMoving() end)
+        m:SetScript("OnDragStop", function(s) s:StopMovingOrSizing(); OO:SaveModelPos() end)
         m:SetScript("OnModelLoaded", function(s)
             pcall(function() s:SetPortraitZoom(s.zoom or 0); s:SetFacing(s.facing or 0.45) end)
         end)
@@ -507,13 +559,56 @@ function OO:UpdateModel(creatureOverride)
     end
     local m = self.model
     m:ClearAllPoints()
-    m:SetPoint("BOTTOMLEFT", self.folioFrame, "BOTTOMLEFT", 36, 30)
+    local mp = self.db.modelPos
+    if mp then m:SetPoint("BOTTOMLEFT", self.folioFrame, "BOTTOMLEFT", mp.x, mp.y)
+    else m:SetPoint("BOTTOMLEFT", self.folioFrame, "BOTTOMLEFT", 36, 30) end
     pcall(function()
         m:SetCreature(creatureOverride or NPC_DECIMUS)
         m:SetPortraitZoom(m.zoom or 0)
         m:SetFacing(m.facing or 0.45)
     end)
     m:Show()
+end
+
+function OO:SaveModelPos()
+    local m, folio = self.model, self.folioFrame
+    if not (m and folio) then return end
+    local ml, mb = m:GetLeft(), m:GetBottom()
+    local fl, fb = folio:GetLeft(), folio:GetBottom()
+    if ml and fl and mb and fb then
+        self.db.modelPos = { x = ml - fl, y = mb - fb }
+    end
+end
+
+-- Decimus speaks a random line (rare set = easter egg) + a talk animation.
+function OO:DecimusSpeak(rare)
+    local m = self.model
+    if not (m and m:IsShown() and m.bubbleText) then return end
+    local pool = rare and DECIMUS_RARE or DECIMUS_QUOTES
+    local line = pool[math.random(#pool)]:gsub("<name>", UnitName("player") or "lightling")
+    m.bubbleText:SetText(line)
+    m.bubble:SetBackdropBorderColor(rare and 0.85 or PALETTE.border[1], rare and 0.20 or PALETTE.border[2], rare and 1.0 or PALETTE.border[3], 1)
+    m.bubble:Show()
+    pcall(function() m:SetAnimation(rare and 64 or 60) end)
+    if self._speakTimer then self._speakTimer:Cancel() end
+    self._speakTimer = C_Timer.NewTimer(rare and 8 or 5, function()
+        if m.bubble then m.bubble:Hide() end
+        pcall(function() m:SetAnimation(0) end)
+    end)
+end
+
+-- Click handler with a hidden easter egg: 7 quick clicks unlocks a rare line.
+function OO:DecimusClicked()
+    local now = GetTime()
+    if now - (self._decClickAt or 0) > 2 then self._decClicks = 0 end
+    self._decClicks = (self._decClicks or 0) + 1
+    self._decClickAt = now
+    if self._decClicks >= 7 then
+        self._decClicks = 0
+        self:DecimusSpeak(true)
+    else
+        self:DecimusSpeak(false)
+    end
 end
 
 -- Standalone "detached" panel mirrors the embed: the left (weeks / tasks / reset)
@@ -578,10 +673,12 @@ function OO:BuildRightLines()
     local motes = self:GetMotes()
     lines[#lines + 1] = string.format(
         "|c" .. PALETTE.gold .. "Motes:|r |cFFFFFFFF%s|r", motes and tostring(motes) or "—")
-    local neb = self:GetCurrency(NEBULOUS_VOIDCORE)
+    local neb, nebMax = self:GetCurrency(NEBULOUS_VOIDCORE)
+    local nebStr = neb and tostring(neb) or "—"
+    if neb and nebMax and nebMax > 0 then nebStr = neb .. "|c" .. PALETTE.dim .. "/" .. nebMax .. "|r" end
     lines[#lines + 1] = string.format(
         "%s|c" .. PALETTE.purple .. "Bonus rolls:|r |cFFFFFFFF%s|r |c" .. PALETTE.dim .. "(Nebulous)|r",
-        IconTag(self:CurrencyIcon(NEBULOUS_VOIDCORE)), neb and tostring(neb) or "—")
+        IconTag(self:CurrencyIcon(NEBULOUS_VOIDCORE)), nebStr)
 
     lines[#lines + 1] = "sep"
     local cores = self:GetItem(ITEM_ASCENDANT_VOIDCORE)
@@ -748,7 +845,7 @@ function OO:BuildConfig()
     close:SetPoint("TOPRIGHT", 2, 2)
     close:SetScript("OnClick", function() f:Hide() end)
 
-    OOConfigSlider(f, "OOConfigOpacity", "Background opacity", "30%", "100%", 0.3, 1.0, self.db.alpha or 0.9, -52,
+    OOConfigSlider(f, "OOConfigOpacity", "Background opacity", "0%", "100%", 0.0, 1.0, self.db.alpha or 0.9, -52,
         function(v) OO.db.alpha = v; OO:ApplyAppearance() end)
     OOConfigSlider(f, "OOConfigScale", "Scale (standalone)", "70%", "150%", 0.7, 1.5, self.db.scale or 1.0, -98,
         function(v) OO.db.scale = v; OO:ApplyAppearance() end)
