@@ -1,8 +1,10 @@
 # OmniumObservator
 
-Omnium Folio companion for World of Warcraft: Midnight 12.0.7+.
+> **WoW:** 12.0.7+ (Midnight) · **Maintainer:** Nelnamara
 
 OmniumObservator embeds **inside the Omnium Folio frame** — the patch 12.0.7 weekly rune system — and tracks everything around it: your weekly rune unlocks, the Decimus Voidstorm economy (Motes, bonus rolls, Ascendant Voidcores/Voidshard), recommended rune builds, and the weekly reset. It also brings Decimus himself into the frame as an interactive, fully voiced 3D model. A standalone panel is available too, for an at-a-glance view without opening the folio.
+
+---
 
 ## Features
 
@@ -17,31 +19,48 @@ OmniumObservator embeds **inside the Omnium Folio frame** — the patch 12.0.7 w
 - **Options panel** — opacity, scale, font size, Decimus size, and a stack of toggles, all in one place
 - **Minimap button** — left-click toggles the panel, right-click opens options
 
-## Setup
+---
 
-None. OmniumObservator auto-detects which of the five "Seeking Knowledge" weeks is current (the weeks are permanent one-time unlocks, so it infers progress from completed quests). Just log in, open the **Omnium Folio**, and the panels appear. `/oo` toggles the standalone panel.
-
-## Slash Commands
-
-| Command | Effect |
-|---|---|
-| `/oo` | Toggle the standalone panel |
-| `/oo config` | Open the options panel |
-| `/oo dock` | Toggle the in-folio dock |
-| `/oo build [role]` | Cycle the recommended rune build, or set one (`m+`, `raid`, `dot`, `pvp`, `casual`, `method`) |
-| `/oo font <8-20>` | Set the panel font size |
-| `/oo model` | Toggle the Decimus 3D model |
-| `/oo voice` | Toggle Decimus's voice lines |
-| `/oo lock` / `/oo unlock` | Lock or unlock frame dragging |
-| `/oo reset` | Reset the standalone panel position |
-
-Most appearance and behavior controls live in **`/oo config`** (or right-click the minimap button): background opacity (0–100%, independent of text/icons), scale, font size, Decimus model size + a position reset, and toggles for the dock, model, voice, rune guide, body watermark, and minimap button.
-
-## Compatibility
+## Requirements
 
 - WoW Midnight 12.0.7+
 - No library dependencies
-- Reads the folio via `C_Traits` (tree 1186), currencies via `C_CurrencyInfo`, items via `C_Item`, and never modifies the Blizzard folio frame (the panels overlay it, parented to `UIParent`)
+
+---
+
+## Installation
+
+Drop the `OmniumObservator` folder into `World of Warcraft\_retail_\Interface\AddOns\`, or install via the CurseForge app.
+
+---
+
+## Usage
+
+No setup needed. OmniumObservator auto-detects which of the five "Seeking Knowledge" weeks is current (the weeks are permanent one-time unlocks, so it infers progress from completed quests). Just log in, open the **Omnium Folio**, and the panels appear. `/oo` toggles the standalone panel.
+
+### Slash Commands
+
+- **`/oo`** — Toggle the standalone panel
+- **`/oo config`** — Open the options panel
+- **`/oo dock`** — Toggle the in-folio dock
+- **`/oo build [role]`** — Cycle the recommended rune build, or set one (`m+`, `raid`, `dot`, `pvp`, `casual`, `method`)
+- **`/oo font <8-20>`** — Set the panel font size
+- **`/oo model`** — Toggle the Decimus 3D model
+- **`/oo voice`** — Toggle Decimus's voice lines
+- **`/oo lock`** / **`/oo unlock`** — Lock or unlock frame dragging
+- **`/oo reset`** — Reset the standalone panel position
+
+### Options Panel
+
+Most appearance and behavior controls live in **`/oo config`** (or right-click the minimap button): background opacity (0–100%, independent of text/icons), scale, font size, Decimus model size + a position reset, and toggles for the dock, model, voice, rune guide, body watermark, and minimap button.
+
+---
+
+## Compatibility / Midnight Notes
+
+Reads the folio via `C_Traits` (tree 1186), currencies via `C_CurrencyInfo`, items via `C_Item`, and never modifies the Blizzard folio frame (the panels overlay it, parented to `UIParent`).
+
+---
 
 ## Changelog
 
@@ -82,13 +101,33 @@ Most appearance and behavior controls live in **`/oo config`** (or right-click t
 ### v1.0.0
 - Initial release: weekly unlock tracker, achievement display, weekly quest tracking
 
+---
+
 ## Roadmap
 
-- [ ] **Curved corners + void background** — custom border and panel-body artwork
-- [ ] **Per-class stat-rune picks** — pull Method.gg's spec-specific stat rune instead of the generic "spec priority" line
-- [ ] **Fully voiced Decimus** — pair each voice line to its bubble text (and add his full line set)
-- [ ] **More weekly data** — Nightmare Prey Hunts, a Voidhammer forge-progress bar (Voidshards → next Ascendant Voidcore), Spark cooldown, catalyst charges
-- [ ] **Slotted-rune readout** — show which runes you've actually picked via `C_Traits` node info
+<details>
+<summary>Planned</summary>
+
+- **Curved corners + void background** — custom border and panel-body artwork
+- **Per-class stat-rune picks** — pull Method.gg's spec-specific stat rune instead of the generic "spec priority" line
+- **Fully voiced Decimus** — pair each voice line to its bubble text (and add his full line set)
+- **More weekly data** — Nightmare Prey Hunts, a Voidhammer forge-progress bar (Voidshards → next Ascendant Voidcore), Spark cooldown, catalyst charges
+- **Slotted-rune readout** — show which runes you've actually picked via `C_Traits` node info
+
+</details>
+
+---
+
+## Feature Requests
+
+<details>
+<summary>How to request</summary>
+
+Open an issue on [GitHub](https://github.com/Nelnamara/OmniumObservator/issues) or leave a CurseForge comment — include your spec and what you'd like tracked.
+
+</details>
+
+---
 
 ## Author
 
