@@ -1,13 +1,20 @@
 # OmniumObservator — CLAUDE.md
 
-**Omnium Folio tracker** for WoW Midnight 12.0.7. Author: Nelnamara.
-Shows weekly unlock progress (weeks 1–5), the auto-detected current "Seeking
-Knowledge" weekly quest, a live Void-Touched Orbs counter, Motes + weekly reset
-timer, a minimap button, and (v1.0.3) a companion panel that docks to the in-game
-Omnium Folio frame.
+**Omnium Folio companion** for WoW Midnight 12.0.7. Author: Nelnamara.
+Embeds draggable panels **inside** the Omnium Folio frame (This week / Voidstorm /
+Decimus's Counsel), tracks the full Decimus Voidstorm economy, shows rarity-colored
+weekly runes, an interactive **voiced 3D Decimus model**, a role-based rune advisor
+(Folio guide + Method.gg), an options panel, and a standalone glance panel + minimap button.
 
 ## Files
 - `OmniumObservator.lua` — single-file addon.
+
+## v1.0.4 architecture (panels, Decimus, guide)
+- **Three embed panels** + a standalone: `self.dockL` (This week), `self.dockR` (Voidstorm), `self.dockGuide` (Counsel), `self.panel`/`self.frame` (standalone). All built by `CreatePanel(name, strata, titleText, showLogo)` (per-panel `headerH`, pooled line/sep widgets, `RenderLines(panel, lines)`). All embed panels are `MakeDockDraggable` (left-drag, save folio-relative offset in `db.dock*Pos`). `OnFolioShown` anchors/show them; standalone hides while folio open.
+- **Builders:** `BuildLeftLines` (weeks+rarity+Nilhammer+reset, collapsible via `db.weeksCollapsed`), `BuildRightLines` (Motes/Nebulous/Voidcores/Voidshard/orbs, real icons via `IconTag(fileID)`), `BuildGuideLines` (role build from `ROLE_BUILDS`), `BuildLines` (standalone = left+right combined).
+- **Decimus model:** `UpdateModel()` — `PlayerModel` parented to UIParent, `SetCreature(NPC_DECIMUS=235697)`, left-drag rotate / scroll zoom / **right-drag move** / click→`DecimusClicked` (7 quick clicks = rare-line easter egg). `DecimusSpeak(rare)` shows bubble + `SetAnimation` + `PlaySoundFile(DECIMUS_SOUNDS[..], "Dialog")` (VO FileDataIDs; seeded `327617`). `db.showModel`/`db.decimusVoice`/`db.modelScale`/`db.modelPos`.
+- **Appearance:** `ApplyAppearance()` — `db.alpha` is **background-only** opacity (SetBackdropColor alpha, 0–1), text/icons stay opaque; watermark = mascot at low alpha; `db.scale` (standalone); `db.fontSize` (dynamic rowH in RenderLines). Palette border = void purple.
+- **Config:** `BuildConfig()` — registered in `UISpecialFrames` (Escape closes; fixes the old freeze). Sliders (opacity/scale/Decimus size) + reset button + toggles.
 
 ## Key data / APIs
 - Weekly quest IDs (one-time **permanent** unlocks, not repeatable): `96410` (w1), `96441` (w2), `96442` (w3), `96443` (w4), `96444` (w5). Progress is inferred: highest completed week + 1 = next available (`IsQuestFlaggedCompleted` is permanent).
@@ -16,7 +23,8 @@ Omnium Folio frame.
 - Aura spellIds are SECRET; only `GetPlayerAuraBySpellID(knownID)` is safe.
 
 ## Slash
-`/oo` (toggle standalone panel) · `dock` (toggle folio dock) · `debug` (dump state incl. folio hook/configID/motes) · `questid` (legacy override) · `lock`/`unlock` · `reset`
+- **User-facing (in README):** `/oo` (toggle standalone) · `config`/`options` · `dock` · `build [m+|raid|dot|pvp|casual|method]` (cycle/set Counsel build) · `font <8-20>` · `model` (toggle Decimus) · `voice` (toggle VO) · `lock`/`unlock` · `reset`.
+- **Dev/test only (NOT in README):** `debug` (dump folio hook/configID/motes/icons) · `runes` (dump purchased tree nodes → spell IDs, for the slotted-rune readout) · `model <id>` (test a creatureID) · `voice <id>` (test a sound FileDataID + add to rotation) · `questid <id>` (legacy quest override).
 
 ## Folio dock (built in v1.0.3)
 The dock is implemented: a branded companion panel anchored to the folio frame on open. Architecture in `OmniumObservator.lua`:
@@ -41,7 +49,7 @@ Nilhammer weekly *progress* (currently just done/not — the "3/3" needs the que
 ## Build / release / deploy
 - BigWigs packager on **`v*` tag push**. CurseForge secret: **`CURSFORGE_API_KEY`** (misspelled, leave as-is).
 - Local test: copy to `D:\World of Warcraft\_retail_\Interface\AddOns\OmniumObservator\`.
-- Current version: **1.0.3** (Interface 120007) — released to CurseForge (tag `v1.0.3`). Dock verified in-game: folio path resolves, hooked, configID `55669420`, Motes display, dock renders beside the folio.
+- Current version: **1.0.4** (Interface 120007) — released to CurseForge (tag `v1.0.4`). Huge release: in-folio embed (3 panels), Voidforge economy, voiced/movable Decimus model, role-based rune Counsel (Folio guide + Method.gg), rarity weeks, options panel, collapsible weeks, font/opacity controls. Next (v1.0.5): curved-corner + void-bg art, per-class stat picks, full voiced Decimus (VO↔text pairs), Prey Hunts/Spark/catalyst, Voidhammer forge bar.
 
 ## Conventions
 - **Never** append a `Co-Authored-By` trailer to commits.
