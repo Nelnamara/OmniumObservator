@@ -38,7 +38,7 @@ Decimus Voidstorm dashboard (bonus rolls: Voidforge/Nebulous Voidcores; Ascendan
 ## Build / release / deploy
 - BigWigs packager on **`v*` tag push**. CurseForge secret: **`CURSFORGE_API_KEY`** (misspelled, leave as-is).
 - Local test: copy to `D:\World of Warcraft\_retail_\Interface\AddOns\OmniumObservator\`.
-- Current version: **1.0.3** (Interface 120007) — committed + deployed to D:, **tag `v1.0.3` once the dock is verified in-game** (folio anchor/strata, Motes read, reset timer).
+- Current version: **1.0.3** (Interface 120007) — released to CurseForge (tag `v1.0.3`). Dock verified in-game: folio path resolves, hooked, configID `55669420`, Motes display, dock renders beside the folio.
 
 ## Conventions
 - **Never** append a `Co-Authored-By` trailer to commits.

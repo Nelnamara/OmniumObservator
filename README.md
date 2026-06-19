@@ -42,7 +42,7 @@ None required. OmniumObservator auto-detects which of the five "Seeking Knowledg
 
 ## Changelog
 
-### v1.0.3 (in testing)
+### v1.0.3
 - **Omnium Folio dock** — a companion panel that anchors to the in-game Omnium Folio frame when you open it, showing Motes, Void-Touched Orbs, the weekly reset countdown, and week progress. Toggle with `/oo dock`
 - **Motes of Omnial Inquiry** — live count read from the folio trait tree (`C_Traits`, tree 1186 / currency 4230)
 - **Weekly reset timer** in both the dock and the standalone panel
