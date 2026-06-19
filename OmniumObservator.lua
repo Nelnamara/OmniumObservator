@@ -85,14 +85,50 @@ local DECIMUS_RARE = {
 -- Pattern: VO_120_Decimus_NN_M. Add more IDs from Wowhead's Decimus "Sounds" tab.
 local DECIMUS_SOUNDS = { 327617 }
 
--- Recommended Omnium Folio rune build (Method.gg, general best). Spell IDs from
--- the in-game rune set. The "Counsel" panel renders these with their real icons.
-local RUNE_GUIDE = {
-    { tier = "Core",      name = "Unleashed Fire",    id = 1279599, note = "best overall" },
-    { tier = "Defensive", name = "Void-Tainted Shell", id = 1279604, note = "shields save you" },
-    { tier = "Lingering", name = "Lingering",         id = 1287555, note = "only option" },
-    { tier = "Stat",      name = "sim your spec",      id = nil,     note = "stat-weighted" },
-    { tier = "Capstone",  name = "Overload",           id = 1279614, note = "best in most" },
+-- Omnium Folio rune spell IDs (for real icons in the Counsel panel).
+local RUNE_IDS = {
+    orbs = 1279596, fire = 1279599, shell = 1279604, mend = 1279603, lynx = 1279605,
+    lingering = 1287555, overload = 1279614, residual = 1279615, echoes = 1279616,
+}
+
+-- Role-based recommended builds (5 rows: Core / Defensive / Lingering / Stat / Capstone).
+-- All builds open with Void-Touched Orbs (the safe core for nearly all specs).
+local ROLE_BUILDS = {
+    { role = "Mythic+", tiers = {
+        { "Core", "Void-Touched Orbs", RUNE_IDS.orbs },
+        { "Def",  "Void-Tainted Shell", RUNE_IDS.shell },
+        { "Ling", "Lingering", RUNE_IDS.lingering },
+        { "Stat", "spec priority", nil },
+        { "Cap",  "Overload", RUNE_IDS.overload },
+    } },
+    { role = "Raid (ST)", tiers = {
+        { "Core", "Void-Touched Orbs", RUNE_IDS.orbs },
+        { "Def",  "Void-Tainted Shell", RUNE_IDS.shell },
+        { "Ling", "Lingering", RUNE_IDS.lingering },
+        { "Stat", "spec priority", nil },
+        { "Cap",  "Echoes", RUNE_IDS.echoes },
+    } },
+    { role = "Raid (DoT)", tiers = {
+        { "Core", "Void-Touched Orbs", RUNE_IDS.orbs },
+        { "Def",  "Void-Tainted Shell", RUNE_IDS.shell },
+        { "Ling", "Lingering", RUNE_IDS.lingering },
+        { "Stat", "spec priority", nil },
+        { "Cap",  "Residual Energy", RUNE_IDS.residual },
+    } },
+    { role = "PvP", tiers = {
+        { "Core", "Void-Touched Orbs", RUNE_IDS.orbs },
+        { "Def",  "Lynxlike Reflexes", RUNE_IDS.lynx },
+        { "Ling", "Lingering", RUNE_IDS.lingering },
+        { "Stat", "Versatility", nil },
+        { "Cap",  "Overload", RUNE_IDS.overload },
+    } },
+    { role = "Casual", tiers = {
+        { "Core", "Void-Touched Orbs", RUNE_IDS.orbs },
+        { "Def",  "Self-Mending", RUNE_IDS.mend },
+        { "Ling", "Lingering", RUNE_IDS.lingering },
+        { "Stat", "Versatility", nil },
+        { "Cap",  "Overload", RUNE_IDS.overload },
+    } },
 }
 
 local CHECK_DONE = "|TInterface\\RaidFrame\\ReadyCheck-Ready:0|t"
@@ -379,6 +415,15 @@ function OO:BuildDock()
     self:MakeDockDraggable(self.dockR, "dockRPos")
     self:MakeDockDraggable(self.dockGuide, "dockGuidePos")
     self:AddCollapseButton(self.dockL)
+    -- [>] role-cycle button on the Counsel panel
+    local rb = CreateFrame("Button", nil, self.dockGuide.frame)
+    rb:SetSize(20, 20)
+    rb:SetPoint("TOPRIGHT", self.dockGuide.frame, "TOPRIGHT", -6, -3)
+    rb:SetFrameLevel(self.dockGuide.frame:GetFrameLevel() + 5)
+    local rt = rb:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    rt:SetAllPoints()
+    rt:SetText(">")
+    rb:SetScript("OnClick", function() OO:CycleGuideRole(1) end)
     self.dockL.frame:Hide()
     self.dockR.frame:Hide()
     self.dockGuide.frame:Hide()
@@ -765,17 +810,25 @@ function OO:BuildRightLines()
     return lines
 end
 
--- "Decimus's Counsel" — recommended rune build with real spell icons.
+-- "Decimus's Counsel" — role-based recommended build, click the header [>] to cycle.
 function OO:BuildGuideLines()
+    local b = ROLE_BUILDS[self.db.guideRole or 3] or ROLE_BUILDS[1]
     local lines = {}
-    lines[#lines + 1] = "|c" .. PALETTE.gold .. "Recommended runes|r |c" .. PALETTE.dim .. "(Method.gg)|r"
+    lines[#lines + 1] = string.format(
+        "|c" .. PALETTE.gold .. "Best for:|r |cFFFFFFFF%s|r  |c" .. PALETTE.dim .. "[ > ]|r", b.role)
     lines[#lines + 1] = "sep"
-    for _, r in ipairs(RUNE_GUIDE) do
-        local icon = r.id and IconTag(self:SpellIcon(r.id)) or ""
+    for _, t in ipairs(b.tiers) do
+        local icon = t[3] and IconTag(self:SpellIcon(t[3])) or ""
         lines[#lines + 1] = string.format("%s|c" .. PALETTE.purple .. "%s:|r |cFFFFFFFF%s|r",
-            icon, r.tier, r.name)
+            icon, t[1], t[2])
     end
     return lines
+end
+
+function OO:CycleGuideRole(dir)
+    local n = #ROLE_BUILDS
+    self.db.guideRole = ((self.db.guideRole or 3) - 1 + (dir or 1)) % n + 1
+    self:Refresh()
 end
 
 function OO:Refresh()
@@ -1169,6 +1222,19 @@ SlashCmdList["OMNIUMOBSERVATOR"] = function(msg)
         end
     elseif cmd == "config" or cmd == "options" then
         OO:BuildConfig()
+    elseif cmd == "build" then
+        if arg and arg ~= "" then
+            local a = arg:lower()
+            for i, b in ipairs(ROLE_BUILDS) do
+                if b.role:lower():find(a, 1, true) then OO.db.guideRole = i end
+            end
+        else
+            OO:CycleGuideRole(1)
+        end
+        OO:Refresh()
+        OO.db.showGuide = true
+        if OO.folioFrame and OO.folioFrame:IsShown() then OO:OnFolioShown() end
+        print("|cFFFFCC00OmniumObservator|r Counsel build: " .. (ROLE_BUILDS[OO.db.guideRole or 3].role))
     elseif cmd == "model" then
         local id = tonumber(arg)
         if id then
