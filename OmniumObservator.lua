@@ -609,6 +609,8 @@ function OO:UpdateModel(creatureOverride)
         self.model = m
     end
     local m = self.model
+    local ms = self.db.modelScale or 1.0
+    m:SetSize(190 * ms, 270 * ms)
     m:ClearAllPoints()
     local mp = self.db.modelPos
     if mp then m:SetPoint("BOTTOMLEFT", self.folioFrame, "BOTTOMLEFT", mp.x, mp.y)
@@ -892,7 +894,7 @@ end
 function OO:BuildConfig()
     if self.config then self.config:Show(); return end
     local f = CreateFrame("Frame", "OOConfigFrame", UIParent, "BackdropTemplate")
-    f:SetSize(310, 362)
+    f:SetSize(310, 430)
     f:SetPoint("CENTER")
     f:SetFrameStrata("DIALOG")
     f:SetToplevel(true)
@@ -926,29 +928,41 @@ function OO:BuildConfig()
         function(v) OO.db.alpha = v; OO:ApplyAppearance() end)
     OOConfigSlider(f, "OOConfigScale", "Scale (standalone)", "70%", "150%", 0.7, 1.5, self.db.scale or 1.0, -98,
         function(v) OO.db.scale = v; OO:ApplyAppearance() end)
+    OOConfigSlider(f, "OOConfigModel", "Decimus size", "S", "L", 0.5, 2.0, self.db.modelScale or 1.0, -144,
+        function(v) OO.db.modelScale = v; if OO.model then OO.model:SetSize(190 * v, 270 * v) end end)
 
-    OOConfigCheck(f, "Lock position", 28, -136, self.db.locked, function(v) OO.db.locked = v end)
-    OOConfigCheck(f, "Folio dock enabled", 28, -162, self.db.dockEnabled, function(v)
+    -- Reset Decimus to his default spot
+    local reset = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+    reset:SetSize(120, 18)
+    reset:SetPoint("TOP", 0, -178)
+    reset:SetText("Reset Decimus pos")
+    reset:SetScript("OnClick", function()
+        OO.db.modelPos = nil
+        if OO.folioFrame and OO.folioFrame:IsShown() then OO:UpdateModel() end
+    end)
+
+    OOConfigCheck(f, "Lock position", 28, -206, self.db.locked, function(v) OO.db.locked = v end)
+    OOConfigCheck(f, "Folio dock enabled", 28, -232, self.db.dockEnabled, function(v)
         OO.db.dockEnabled = v
         if not v then OO:OnFolioHidden()
         elseif OO.folioFrame and OO.folioFrame:IsShown() then OO:OnFolioShown() end
     end)
-    OOConfigCheck(f, "Show Decimus model", 28, -188, self.db.showModel, function(v)
+    OOConfigCheck(f, "Show Decimus model", 28, -258, self.db.showModel, function(v)
         OO.db.showModel = v
         if OO.folioFrame and OO.folioFrame:IsShown() then OO:UpdateModel() end
     end)
-    OOConfigCheck(f, "Decimus voice (plays his lines)", 28, -214, self.db.decimusVoice ~= false, function(v)
+    OOConfigCheck(f, "Decimus voice (plays his lines)", 28, -284, self.db.decimusVoice ~= false, function(v)
         OO.db.decimusVoice = v
     end)
-    OOConfigCheck(f, "Show rune guide (Decimus's Counsel)", 28, -240, self.db.showGuide, function(v)
+    OOConfigCheck(f, "Show rune guide (Decimus's Counsel)", 28, -310, self.db.showGuide, function(v)
         OO.db.showGuide = v
         if OO.folioFrame and OO.folioFrame:IsShown() then OO:OnFolioShown() end
     end)
-    OOConfigCheck(f, "Body watermark", 28, -266, self.db.watermark ~= false, function(v)
+    OOConfigCheck(f, "Body watermark", 28, -336, self.db.watermark ~= false, function(v)
         OO.db.watermark = v
         OO:ApplyAppearance()
     end)
-    OOConfigCheck(f, "Show minimap button", 28, -292, not self.db.minimapHide, function(v)
+    OOConfigCheck(f, "Show minimap button", 28, -362, not self.db.minimapHide, function(v)
         OO.db.minimapHide = not v
         if OO.minimapBtn then OO.minimapBtn:SetShown(v) end
     end)
