@@ -327,10 +327,39 @@ end
 -- columns when it opens). Parented to UIParent so we never taint the Traits frame.
 function OO:BuildDock()
     if self.dockL then return end
-    self.dockL = self:CreatePanel("OODockLeft",  "HIGH", "|c" .. PALETTE.title .. "This week|r", false)
+    self.dockL = self:CreatePanel("OODockLeft",  "HIGH", "|c" .. PALETTE.title .. "This week|r", true)
     self.dockR = self:CreatePanel("OODockRight", "HIGH", "|c" .. PALETTE.title .. "Voidstorm|r", false)
+    self:MakeDockDraggable(self.dockL, "dockLPos")
+    self:MakeDockDraggable(self.dockR, "dockRPos")
     self.dockL.frame:Hide()
     self.dockR.frame:Hide()
+end
+
+-- Drag a folio panel and remember where it was dropped (offset from the folio's
+-- top-left). Respects the lock toggle.
+function OO:MakeDockDraggable(panel, key)
+    local f = panel.frame
+    f:SetMovable(true)
+    f:EnableMouse(true)
+    f:RegisterForDrag("LeftButton")
+    f:SetScript("OnDragStart", function(s) if not OO.db.locked then s:StartMoving() end end)
+    f:SetScript("OnDragStop", function(s)
+        s:StopMovingOrSizing()
+        OO:SaveDockPos(panel, key)
+    end)
+end
+
+function OO:SaveDockPos(panel, key)
+    local f, folio = panel.frame, self.folioFrame
+    if not folio then return end
+    local fl, ft = f:GetLeft(), f:GetTop()
+    local gl, gt = folio:GetLeft(), folio:GetTop()
+    if fl and gl and ft and gt then
+        local dx, dy = fl - gl, ft - gt
+        self.db[key] = { x = dx, y = dy }
+        f:ClearAllPoints()
+        f:SetPoint("TOPLEFT", folio, "TOPLEFT", dx, dy)
+    end
 end
 
 -- Locate the Omnium Folio frame (only present once Blizzard_ExpansionLandingPage
@@ -383,13 +412,16 @@ function OO:OnFolioShown()
             if id and id > 0 then self.folioConfigID = id end
         end
     end)
-    -- Embed: anchor the two panels INSIDE the folio's empty columns, flanking the
-    -- rune tree. Offsets are a first pass — tune here if they overlap the tree/title.
+    -- Embed: anchor inside the folio's empty columns (or wherever you dragged them).
     local lf, rf = self.dockL.frame, self.dockR.frame
+    local folio = self.folioFrame
+    local lp, rp = self.db.dockLPos, self.db.dockRPos
     lf:ClearAllPoints()
-    lf:SetPoint("TOPLEFT", self.folioFrame, "TOPLEFT", 28, -96)
+    if lp then lf:SetPoint("TOPLEFT", folio, "TOPLEFT", lp.x, lp.y)
+    else lf:SetPoint("TOPLEFT", folio, "TOPLEFT", 28, -96) end
     rf:ClearAllPoints()
-    rf:SetPoint("TOPRIGHT", self.folioFrame, "TOPRIGHT", -28, -96)
+    if rp then rf:SetPoint("TOPLEFT", folio, "TOPLEFT", rp.x, rp.y)
+    else rf:SetPoint("TOPRIGHT", folio, "TOPRIGHT", -28, -96) end
     lf:Show()
     rf:Show()
     -- The embed is the single source of info while the folio is open — hide the
@@ -850,6 +882,9 @@ SlashCmdList["OMNIUMOBSERVATOR"] = function(msg)
         print(string.format("  Folio: hooked=%s configID=%s motes=%s reset=%s orbs=%s",
             tostring(OO.folioHooked), tostring(OO.folioConfigID),
             tostring(OO:GetMotes()), tostring(OO:GetResetSeconds()), tostring(OO:GetVoidOrbs())))
+        print(string.format("  Icons: neb=%s core=%s shard=%s orb=%s",
+            tostring(OO:CurrencyIcon(NEBULOUS_VOIDCORE)), tostring(OO:ItemIcon(ITEM_ASCENDANT_VOIDCORE)),
+            tostring(OO:ItemIcon(ITEM_ASCENDANT_VOIDSHARD)), tostring(OO:SpellIcon(RUNE_VOID_ORBS))))
         for _, q in ipairs(WEEKLY_QUESTS) do
             print(string.format("    Quest %d (wk%d): completed=%s",
                 q.id, q.week, tostring(C_QuestLog.IsQuestFlaggedCompleted(q.id))))
