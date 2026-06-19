@@ -3,13 +3,15 @@
 -- Author: Nelnamara
 --
 -- Tracks weekly progress through the Omnium Folio achievement chain (63325),
--- monitors the "Seeking Knowledge" weekly quest, and displays which of the 5 rune
--- rows have been unlocked. Use /oo questid <id> once you know the weekly quest ID.
+-- auto-detects the current "Seeking Knowledge" weekly quest, shows the live
+-- Void-Touched Orb count, and (v1.0.3) docks a companion panel to the in-game
+-- Omnium Folio frame showing Motes, orbs, the weekly reset timer, and week
+-- progress. Standalone panel remains available via /oo or the minimap button.
 
 OmniumObservator = {}
 local OO = OmniumObservator
 
-OO.version = "1.0.2"
+OO.version = "1.0.3"
 
 -- Achievement IDs (confirmed from 12.0.7 PTR datamine)
 local ACH_OMNIUM_FOLIO   = 63325
@@ -33,6 +35,39 @@ local WEEK_NAMES = {
     "Magical Primessence",
 }
 
+-- Omnium Folio frame (Traits tree) — confirmed in-game:
+--   ExpansionLandingPage.Overlay.MidnightLandingOverlay.RunesOfPowerFrame
+-- treeID 1186, Motes of Omnial Inquiry = trait currency 4230 (NOT a C_CurrencyInfo currency).
+local FOLIO_TREE_ID    = 1186
+local MOTES_CURRENCY   = 4230
+local RUNE_VOID_ORBS   = 1279596  -- Rune of Void-Touched Orbs; player aura stacks 0-5
+
+-- Suite branding palette (purple / gold / black)
+local PALETTE = {
+    bg     = { 0.04, 0.02, 0.07, 0.92 },  -- near-black with a faint purple cast
+    border = { 1.00, 0.82, 0.00, 0.90 },  -- gold
+    title  = "FFFFD200",                   -- gold (title text colour code)
+    gold   = "FFFFD700",
+    purple = "FFBB66FF",
+    dim    = "FF888888",
+}
+
+local CHECK_DONE = "|TInterface\\RaidFrame\\ReadyCheck-Ready:0|t"
+local function Check(done)
+    if done then return CHECK_DONE end
+    return "|c" .. PALETTE.dim .. "\226\128\162|r"  -- dim bullet (•) for pending weeks
+end
+
+local function FmtDur(sec)
+    if not sec or sec <= 0 then return "now" end
+    local d = math.floor(sec / 86400)
+    local h = math.floor((sec % 86400) / 3600)
+    local m = math.floor((sec % 3600) / 60)
+    if d > 0 then return string.format("%dd %dh", d, h) end
+    if h > 0 then return string.format("%dh %dm", h, m) end
+    return string.format("%dm", m)
+end
+
 local DEFAULTS = {
     x            =  400,
     y            =  200,
@@ -42,11 +77,8 @@ local DEFAULTS = {
     weeklyQuestID = nil,
     minimapAngle = 225,
     minimapHide  = false,
+    dockEnabled  = true,
 }
-
-local function Check(done)
-    return done and "|cFF66FF66[✓]|r" or "|cFF666666[ ]|r"
-end
 
 function OO:GetAchievementData()
     local _, _, _, overallDone, _, _, _, _, _, _, alreadyEarned =
@@ -101,19 +133,12 @@ function OO:GetWeeklyState()
     if highestDone >= 5 then
         return { week = 5, name = "Magical Primessence", done = true, allDone = true }
     elseif highestDone > 0 then
-        local next = WEEKLY_QUESTS[highestDone + 1]
-        return { week = next.week, name = next.name, done = false, inLog = false, nextReset = true }
+        local nextQ = WEEKLY_QUESTS[highestDone + 1]
+        return { week = nextQ.week, name = nextQ.name, done = false, inLog = false, nextReset = true }
     else
         return { week = 1, name = "The Omnium Folio", done = false, inLog = false, nextReset = false }
     end
 end
-
-local ROW_H   = 18
-local FRAME_W = 265
-local TITLE_H = 20
-local PAD     = 6
-
-local RUNE_VOID_ORBS = 1279596  -- Rune of Void-Touched Orbs; player aura stacks 0-5
 
 -- Returns the current Void-Touched Orb count (0-5) if the rune's aura is up, else nil.
 function OO:GetVoidOrbs()
@@ -132,26 +157,96 @@ function OO:GetVoidOrbs()
     return n
 end
 
+-- Motes of Omnial Inquiry — the folio Traits-tree currency. Needs the folio
+-- frame's live configID (captured when the folio is opened). pcall-guarded; the
+-- C_Traits values can be secret/unavailable depending on context.
+function OO:GetMotes()
+    if not (C_Traits and self.folioConfigID) then return nil end
+    local q
+    pcall(function()
+        local info = C_Traits.GetTreeCurrencyInfo(self.folioConfigID, FOLIO_TREE_ID, false)
+        if type(info) == "table" then
+            for _, c in ipairs(info) do
+                if c.traitCurrencyID == MOTES_CURRENCY then q = c.quantity end
+            end
+            if q == nil and info[1] then q = info[1].quantity end
+        end
+    end)
+    return q
+end
+
+function OO:GetResetSeconds()
+    if not (C_DateAndTime and C_DateAndTime.GetSecondsUntilWeeklyReset) then return nil end
+    local s
+    pcall(function() s = C_DateAndTime.GetSecondsUntilWeeklyReset() end)
+    return s
+end
+
+local ROW_H   = 18
+local FRAME_W = 265
+local TITLE_H = 22
+local PAD     = 6
+
+-- Builds a backdrop panel (branded) with a header logo + title, a divider, and
+-- pooled line/separator widgets. Returns { frame, linePool, sepPool }. Shared by
+-- the standalone panel and the folio dock.
+function OO:CreatePanel(name, strata)
+    local f = CreateFrame("Frame", name, UIParent, "BackdropTemplate")
+    f:SetSize(FRAME_W, TITLE_H + ROW_H * 9 + PAD * 2)
+    f:SetFrameStrata(strata or "MEDIUM")
+    f:SetClampedToScreen(true)
+    f:SetBackdrop({
+        bgFile   = "Interface\\Buttons\\WHITE8x8",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        tile = false, edgeSize = 12,
+        insets = { left = 3, right = 3, top = 3, bottom = 3 },
+    })
+    f:SetBackdropColor(unpack(PALETTE.bg))
+    f:SetBackdropBorderColor(unpack(PALETTE.border))
+
+    local logo = f:CreateTexture(nil, "ARTWORK")
+    logo:SetSize(16, 16)
+    logo:SetPoint("TOPLEFT", f, "TOPLEFT", PAD, -3)
+    logo:SetTexture("Interface\\AddOns\\OmniumObservator\\Media\\icon.png")
+
+    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    title:SetPoint("LEFT", logo, "RIGHT", 4, 0)
+    title:SetText("|c" .. PALETTE.title .. "OmniumObservator|r  |c" .. PALETTE.dim .. OO.version .. "|r")
+
+    local divider = f:CreateTexture(nil, "BACKGROUND")
+    divider:SetSize(FRAME_W - 16, 1)
+    divider:SetPoint("TOP", f, "TOP", 0, -(TITLE_H - 2))
+    divider:SetColorTexture(1.0, 0.82, 0.0, 0.5)
+
+    local panel = { frame = f, linePool = {}, sepPool = {} }
+    for i = 1, 20 do
+        local fs = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        fs:SetPoint("TOPLEFT", f, "TOPLEFT", PAD + 2, -(TITLE_H + (i - 1) * ROW_H + 4))
+        fs:SetWidth(FRAME_W - PAD * 2 - 4)
+        fs:SetJustifyH("LEFT")
+        fs:SetWordWrap(false)
+        fs:Hide()
+        panel.linePool[i] = fs
+    end
+    for i = 1, 5 do
+        local sep = f:CreateTexture(nil, "BACKGROUND")
+        sep:SetSize(FRAME_W - 20, 1)
+        sep:SetColorTexture(0.60, 0.50, 0.10, 0.4)
+        sep:Hide()
+        panel.sepPool[i] = sep
+    end
+    return panel
+end
+
 function OO:BuildUI()
     local db = self.db
-
-    local frame = CreateFrame("Frame", "OOMainFrame", UIParent, "BackdropTemplate")
-    frame:SetSize(FRAME_W, TITLE_H + ROW_H * 9 + PAD * 2)
+    local panel = self:CreatePanel("OOMainFrame", "MEDIUM")
+    local frame = panel.frame
     frame:SetPoint("CENTER", UIParent, "CENTER", db.x, db.y)
     frame:SetScale(db.scale)
     frame:SetAlpha(db.alpha)
-    frame:SetFrameStrata("MEDIUM")
     frame:SetMovable(true)
     frame:EnableMouse(true)
-    frame:SetClampedToScreen(true)
-    frame:SetBackdrop({
-        bgFile   = "Interface\\DialogFrame\\UI-DialogBox-Background-Dark",
-        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-        tile = true, tileSize = 32, edgeSize = 12,
-        insets = { left = 3, right = 3, top = 3, bottom = 3 },
-    })
-    frame:SetBackdropColor(0.06, 0.05, 0.02, 0.88)
-    frame:SetBackdropBorderColor(0.70, 0.60, 0.15, 0.85)
 
     frame:SetScript("OnMouseDown", function(self, btn)
         if btn == "LeftButton" and not OO.db.locked then self:StartMoving() end
@@ -160,73 +255,111 @@ function OO:BuildUI()
         self:StopMovingOrSizing()
         OO:SavePosition()
     end)
-
-    local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    title:SetPoint("TOP", frame, "TOP", 0, -5)
-    title:SetText("|cFFFFCC00OmniumObservator|r  |cFF888888" .. OO.version .. "|r")
-
-    local divider = frame:CreateTexture(nil, "BACKGROUND")
-    divider:SetSize(FRAME_W - 16, 1)
-    divider:SetPoint("TOP", frame, "TOP", 0, -(TITLE_H - 2))
-    divider:SetColorTexture(0.60, 0.50, 0.10, 0.6)
-
-    self.linePool = {}
-    for i = 1, 20 do
-        local fs = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-        fs:SetPoint("TOPLEFT", frame, "TOPLEFT", PAD + 2, -(TITLE_H + (i - 1) * ROW_H + 4))
-        fs:SetWidth(FRAME_W - PAD * 2 - 4)
-        fs:SetJustifyH("LEFT")
-        fs:SetWordWrap(false)
-        fs:Hide()
-        self.linePool[i] = fs
-    end
-
-    self.sepPool = {}
-    for i = 1, 4 do
-        local sep = frame:CreateTexture(nil, "BACKGROUND")
-        sep:SetSize(FRAME_W - 20, 1)
-        sep:SetColorTexture(0.50, 0.40, 0.10, 0.4)
-        sep:Hide()
-        self.sepPool[i] = sep
-    end
+    frame:SetScript("OnShow", function() OO:Refresh() end)
 
     frame:Show()
+    self.panel = panel
     self.frame = frame
 end
 
-function OO:Refresh()
-    if not self.frame then return end
+-- Lazily create the dock panel (anchored to the folio frame when it opens).
+function OO:BuildDock()
+    if self.dock then return end
+    local panel = self:CreatePanel("OODockFrame", "HIGH")
+    panel.frame:Hide()
+    self.dock = panel
+end
 
-    local achData  = self:GetAchievementData()
-    local ws       = self:GetWeeklyState()
+-- Locate the Omnium Folio frame (only present once Blizzard_ExpansionLandingPage
+-- has loaded — it is LoadOnDemand, opened from the Midnight landing button).
+function OO:GetFolioFrame()
+    local elp = _G.ExpansionLandingPage
+    local ov  = elp and elp.Overlay
+    local mlo = ov and ov.MidnightLandingOverlay
+    return mlo and mlo.RunesOfPowerFrame or nil
+end
 
-    local lines = {}
+function OO:TryHookFolio()
+    if self.folioHooked then return end
+    local rof = self:GetFolioFrame()
+    if not rof then return end
+    self.folioFrame = rof
+    self:BuildDock()
+    rof:HookScript("OnShow", function() OO:OnFolioShown() end)
+    rof:HookScript("OnHide", function() OO:OnFolioHidden() end)
+    self.folioHooked = true
+    if rof:IsShown() then self:OnFolioShown() end
+end
 
-    -- Void-Touched Orbs live counter (Omnium Folio core rune resource)
-    local orbs = self:GetVoidOrbs()
+function OO:OnFolioShown()
+    if not self.db.dockEnabled or not self.dock then return end
+    -- capture the live configID (it can change between sessions)
+    pcall(function()
+        if self.folioFrame and self.folioFrame.GetConfigID then
+            local id = self.folioFrame:GetConfigID()
+            if id and id > 0 then self.folioConfigID = id end
+        end
+    end)
+    local d = self.dock.frame
+    d:ClearAllPoints()
+    -- Dock to the right edge of the folio. If it renders behind the folio in
+    -- testing, raise the strata in BuildDock.
+    d:SetPoint("TOPLEFT", self.folioFrame, "TOPRIGHT", 8, 0)
+    d:Show()
+    self:Refresh()
+    -- keep the reset timer / Mote count fresh while the folio is open
+    d:SetScript("OnUpdate", function(s, elapsed)
+        s._t = (s._t or 0) + elapsed
+        if s._t > 5 then s._t = 0; OO:Refresh() end
+    end)
+end
+
+function OO:OnFolioHidden()
+    if self.dock then
+        self.dock.frame:SetScript("OnUpdate", nil)
+        self.dock.frame:Hide()
+    end
+end
+
+-- Shared content builder — both panels render the same line list.
+function OO:BuildLines()
+    local achData = self:GetAchievementData()
+    local ws      = self:GetWeeklyState()
+    local lines   = {}
+
+    -- Folio resources (shown when the values are known)
+    local motes = self:GetMotes()
+    local orbs  = self:GetVoidOrbs()
+    local reset = self:GetResetSeconds()
+    if motes then
+        lines[#lines + 1] = string.format(
+            "|c" .. PALETTE.gold .. "Motes of Omnial Inquiry:|r |cFFFFFFFF%d|r", motes)
+    end
     if orbs then
         lines[#lines + 1] = string.format(
-            "|cFFBB66FFVoid-Touched Orbs:|r |cFFFFFFFF%d|r|cFF888888/5|r", orbs)
-        lines[#lines + 1] = "sep"
+            "|c" .. PALETTE.purple .. "Void-Touched Orbs:|r |cFFFFFFFF%d|r|c" .. PALETTE.dim .. "/5|r", orbs)
     end
+    if reset then
+        lines[#lines + 1] = string.format(
+            "|c" .. PALETTE.dim .. "Weekly reset in|r |cFFFFFFFF%s|r", FmtDur(reset))
+    end
+    if motes or orbs or reset then lines[#lines + 1] = "sep" end
 
-    -- Overall achievement header
-    local unlockedCount = 0
+    -- Overall achievement header + week progress
+    local unlocked = 0
     for _, step in ipairs(achData.steps) do
-        if step.done then unlockedCount = unlockedCount + 1 end
+        if step.done then unlocked = unlocked + 1 end
     end
-
     if achData.overall then
-        lines[#lines + 1] = "|cFFFFD700Omnium Folio Studies: |cFF66FF66COMPLETE|r"
+        lines[#lines + 1] = "|c" .. PALETTE.gold .. "Omnium Folio Studies: |cFF66FF66COMPLETE|r"
     else
         lines[#lines + 1] = string.format(
-            "|cFFFFD700Omnium Folio:|r |cFFCCCCCC%d/5 weeks unlocked|r", unlockedCount)
+            "|c" .. PALETTE.gold .. "Omnium Folio|r  |cFFFFFFFF%d|r|c" .. PALETTE.dim .. "/5 weeks|r", unlocked)
     end
-
     lines[#lines + 1] = "sep"
 
-    -- 5 weekly rows (driven by achievement criteria)
-    for i, step in ipairs(achData.steps) do
+    -- 5 weekly rows (driven by achievement criteria), with check/bullet visuals
+    for _, step in ipairs(achData.steps) do
         lines[#lines + 1] = string.format("%s |cFFCCCCCC%s|r", Check(step.done), step.name)
     end
 
@@ -239,36 +372,47 @@ function OO:Refresh()
             "|cFFFFDD88Week %d: %s — In progress|r", ws.week, ws.name)
     elseif ws.nextReset then
         lines[#lines + 1] = string.format(
-            "|cFF888888Week %d: %s — available next reset|r", ws.week, ws.name)
+            "|c" .. PALETTE.dim .. "Week %d: %s — available next reset|r", ws.week, ws.name)
     else
         lines[#lines + 1] = string.format(
-            "|cFF888888Week 1: %s — pick up quest in Silvermoon|r", ws.name)
+            "|c" .. PALETTE.dim .. "Week 1: %s — pick up quest in Silvermoon|r", ws.name)
     end
 
-    self:RenderLines(lines)
+    return lines
 end
 
-function OO:RenderLines(lines)
+function OO:Refresh()
+    local lines = self:BuildLines()
+    if self.panel and self.frame and self.frame:IsShown() then
+        self:RenderLines(self.panel, lines)
+    end
+    if self.dock and self.dock.frame:IsShown() then
+        self:RenderLines(self.dock, lines)
+    end
+end
+
+function OO:RenderLines(panel, lines)
+    local frame   = panel.frame
     local sepIdx  = 1
     local lineIdx = 0
     local yOff    = 0
 
     for _, entry in ipairs(lines) do
         if entry == "sep" then
-            local sep = self.sepPool[sepIdx]
+            local sep = panel.sepPool[sepIdx]
             if sep then
-                sep:SetPoint("TOPLEFT", self.frame, "TOPLEFT", PAD + 4,
-                    -(TITLE_H + yOff + ROW_H / 2))
+                sep:ClearAllPoints()
+                sep:SetPoint("TOPLEFT", frame, "TOPLEFT", PAD + 4, -(TITLE_H + yOff + ROW_H / 2))
                 sep:Show()
                 sepIdx = sepIdx + 1
                 yOff = yOff + ROW_H / 2
             end
         else
             lineIdx = lineIdx + 1
-            local fs = self.linePool[lineIdx]
+            local fs = panel.linePool[lineIdx]
             if fs then
-                fs:SetPoint("TOPLEFT", self.frame, "TOPLEFT", PAD + 2,
-                    -(TITLE_H + yOff + 4))
+                fs:ClearAllPoints()
+                fs:SetPoint("TOPLEFT", frame, "TOPLEFT", PAD + 2, -(TITLE_H + yOff + 4))
                 fs:SetText(entry)
                 fs:Show()
                 yOff = yOff + ROW_H
@@ -276,10 +420,10 @@ function OO:RenderLines(lines)
         end
     end
 
-    for i = lineIdx + 1, #self.linePool do self.linePool[i]:Hide() end
-    for i = sepIdx, #self.sepPool do self.sepPool[i]:Hide() end
+    for i = lineIdx + 1, #panel.linePool do panel.linePool[i]:Hide() end
+    for i = sepIdx, #panel.sepPool do panel.sepPool[i]:Hide() end
 
-    self.frame:SetHeight(TITLE_H + yOff + PAD * 2)
+    frame:SetHeight(TITLE_H + yOff + PAD * 2)
 end
 
 function OO:SavePosition()
@@ -321,6 +465,7 @@ function OO:BuildMinimapButton()
         GameTooltip:AddLine("Left-click: Toggle panel", 1, 1, 1)
         GameTooltip:AddLine("Right-click: Dump state", 1, 1, 1)
         GameTooltip:AddLine("Drag: Reposition", 0.7, 0.7, 0.7)
+        GameTooltip:AddLine("Tip: open the Omnium Folio to see the dock", 0.6, 0.9, 0.6)
         GameTooltip:Show()
     end)
     btn:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -354,21 +499,30 @@ end
 
 local ef = CreateFrame("Frame", "OOEventFrame")
 ef:RegisterEvent("ADDON_LOADED")
+ef:RegisterEvent("PLAYER_ENTERING_WORLD")
 ef:SetScript("OnEvent", function(self, event, ...)
-    if event == "ADDON_LOADED" and ... == "OmniumObservator" then
-        if not OmniumObservatorDB then OmniumObservatorDB = CopyTable(DEFAULTS) end
-        OO.db = OmniumObservatorDB
-        for k, v in pairs(DEFAULTS) do
-            if OO.db[k] == nil then OO.db[k] = v end
+    if event == "ADDON_LOADED" then
+        local name = ...
+        if name == "OmniumObservator" then
+            if not OmniumObservatorDB then OmniumObservatorDB = CopyTable(DEFAULTS) end
+            OO.db = OmniumObservatorDB
+            for k, v in pairs(DEFAULTS) do
+                if OO.db[k] == nil then OO.db[k] = v end
+            end
+            OO:BuildUI()
+            OO:BuildMinimapButton()
+            OO:TryHookFolio()  -- in case the folio addon is already loaded
+            OO:Refresh()
+            self:RegisterEvent("ACHIEVEMENT_EARNED")
+            self:RegisterEvent("CRITERIA_UPDATE")
+            self:RegisterEvent("QUEST_LOG_UPDATE")
+            self:RegisterEvent("UNIT_AURA")
+            self:RegisterEvent("PLAYER_LOGOUT")
+        elseif name == "Blizzard_ExpansionLandingPage" then
+            OO:TryHookFolio()
         end
-        OO:BuildUI()
-        OO:BuildMinimapButton()
-        OO:Refresh()
-        self:RegisterEvent("ACHIEVEMENT_EARNED")
-        self:RegisterEvent("CRITERIA_UPDATE")
-        self:RegisterEvent("QUEST_LOG_UPDATE")
-        self:RegisterEvent("UNIT_AURA")
-        self:RegisterEvent("PLAYER_LOGOUT")
+    elseif event == "PLAYER_ENTERING_WORLD" then
+        if OO.db then OO:TryHookFolio() end
     elseif event == "ACHIEVEMENT_EARNED" or event == "CRITERIA_UPDATE" or event == "QUEST_LOG_UPDATE" then
         OO:Refresh()
     elseif event == "UNIT_AURA" then
@@ -401,6 +555,14 @@ SlashCmdList["OMNIUMOBSERVATOR"] = function(msg)
             print("|cFFFFCC00OmniumObservator|r The addon auto-detects weekly quest progress.")
             print("  Known IDs: 96410 (wk1) 96441 (wk2) 96442 (wk3) 96443 (wk4) 96444 (wk5)")
         end
+    elseif cmd == "dock" then
+        OO.db.dockEnabled = not OO.db.dockEnabled
+        print("|cFFFFCC00OmniumObservator|r folio dock " .. (OO.db.dockEnabled and "|cFF66FF66enabled|r" or "|cFFFF6666disabled|r"))
+        if not OO.db.dockEnabled and OO.dock then
+            OO:OnFolioHidden()
+        elseif OO.db.dockEnabled and OO.folioFrame and OO.folioFrame:IsShown() then
+            OO:OnFolioShown()
+        end
     elseif cmd == "debug" then
         print("|cFFFFCC00OmniumObservator|r " .. OO.version)
         local achData = OO:GetAchievementData()
@@ -413,6 +575,9 @@ SlashCmdList["OMNIUMOBSERVATOR"] = function(msg)
             ws.week or 0, ws.name or "?",
             tostring(ws.inLog), tostring(ws.done),
             tostring(ws.allDone), tostring(ws.nextReset)))
+        print(string.format("  Folio: hooked=%s configID=%s motes=%s reset=%s orbs=%s",
+            tostring(OO.folioHooked), tostring(OO.folioConfigID),
+            tostring(OO:GetMotes()), tostring(OO:GetResetSeconds()), tostring(OO:GetVoidOrbs())))
         for _, q in ipairs(WEEKLY_QUESTS) do
             print(string.format("    Quest %d (wk%d): completed=%s",
                 q.id, q.week, tostring(C_QuestLog.IsQuestFlaggedCompleted(q.id))))

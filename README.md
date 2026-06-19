@@ -42,6 +42,14 @@ None required. OmniumObservator auto-detects which of the five "Seeking Knowledg
 
 ## Changelog
 
+### v1.0.3 (in testing)
+- **Omnium Folio dock** — a companion panel that anchors to the in-game Omnium Folio frame when you open it, showing Motes, Void-Touched Orbs, the weekly reset countdown, and week progress. Toggle with `/oo dock`
+- **Motes of Omnial Inquiry** — live count read from the folio trait tree (`C_Traits`, tree 1186 / currency 4230)
+- **Weekly reset timer** in both the dock and the standalone panel
+- **Suite branding + restyle** — purple/gold/black palette, gold border, and the addon icon as a header logo
+- **Week-progress visuals** — green-check icons for unlocked weeks, dim bullets for pending
+- Hardened the orb counter against a secret `applications` value (pcall guard)
+
 ### v1.0.2
 - Live Void-Touched Orbs counter (Omnium Folio rune `1279596`), read via `GetPlayerAuraBySpellID` on a throttled `UNIT_AURA` and hardened against a secret `applications` value
 - Minimap button and AddOns-list icon (addon artwork, standard 24px)
@@ -55,12 +63,11 @@ None required. OmniumObservator auto-detects which of the five "Seeking Knowledg
 
 ## Roadmap
 
-The next major step is to fold OmniumObservator into the in-game **Omnium Folio frame** rather than a standalone panel — a single point of info with no extra clutter.
+Phase 1 — the dock + Motes + weekly reset timer — landed in v1.0.3. Still to come:
 
-- [ ] **Dock to the folio** — anchor a companion panel to the Omnium Folio (`RunesOfPowerFrame`) on open, showing the weekly Seeking Knowledge step, weekly reset timer, week progress, and the live orb counter
-- [ ] **Motes of Omnial Inquiry** — display the folio's trait-tree currency (read via `C_Traits.GetTreeCurrencyInfo`, not the currency tab)
-- [ ] **Decimus Voidstorm dashboard** — surface the broader weekly economy: bonus rolls (Voidforge / Nebulous Voidcores) for raid/Delves/M+, and the Ascendant Nilhammer ("Voidhammer") weapon/trinket upgrade track
+- [ ] **Decimus Voidstorm dashboard** — surface the broader weekly economy in the dock: bonus rolls (Voidforge / Nebulous Voidcores) for raid/Delves/M+, and the Ascendant Nilhammer ("Voidhammer") weapon/trinket upgrade track
 - [ ] **Slotted-rune readout** — show which runes are active via `C_Traits` node/entry info
+- [ ] **Open the folio from the minimap button** — if a safe (non-protected) path exists
 
 ## Author
 
