@@ -467,7 +467,8 @@ end
 
 -- Decimus 3D creature model in the folio's lower-left empty space (opt-in via
 -- config). Parented to UIParent + anchored to the folio so the Traits frame is
--- never touched. Heavily guarded — a bad creature ID just shows nothing.
+-- never touched. Interactive like WoW's native model frames: left-drag to rotate,
+-- scroll to zoom. Heavily guarded — a bad creature ID just shows nothing.
 function OO:UpdateModel(creatureOverride)
     if not self.folioFrame then return end
     if not self.db.showModel then
@@ -477,8 +478,31 @@ function OO:UpdateModel(creatureOverride)
     if not self.model then
         local m = CreateFrame("PlayerModel", "OODecimusModel", UIParent)
         m:SetFrameStrata("HIGH")
-        m:SetSize(170, 250)
-        m:EnableMouse(false)
+        m:SetSize(190, 270)
+        m:EnableMouse(true)
+        m:EnableMouseWheel(true)
+        m.facing, m.zoom = 0.45, 0
+
+        m:SetScript("OnMouseDown", function(s, btn)
+            if btn == "LeftButton" then s.rotating = true; s.lastX = GetCursorPosition() end
+        end)
+        m:SetScript("OnMouseUp", function(s) s.rotating = false end)
+        m:SetScript("OnUpdate", function(s)
+            if s.rotating then
+                local x = GetCursorPosition()
+                s.facing = (s.facing or 0) + (x - (s.lastX or x)) * 0.012
+                s.lastX = x
+                pcall(function() s:SetFacing(s.facing) end)
+            end
+        end)
+        m:SetScript("OnMouseWheel", function(s, delta)
+            s.zoom = math.max(0, math.min(0.9, (s.zoom or 0) + delta * 0.1))
+            pcall(function() s:SetPortraitZoom(s.zoom) end)
+        end)
+        -- Reset framing whenever the model finishes (re)loading.
+        m:SetScript("OnModelLoaded", function(s)
+            pcall(function() s:SetPortraitZoom(s.zoom or 0); s:SetFacing(s.facing or 0.45) end)
+        end)
         self.model = m
     end
     local m = self.model
@@ -486,8 +510,8 @@ function OO:UpdateModel(creatureOverride)
     m:SetPoint("BOTTOMLEFT", self.folioFrame, "BOTTOMLEFT", 36, 30)
     pcall(function()
         m:SetCreature(creatureOverride or NPC_DECIMUS)
-        m:SetPortraitZoom(0)
-        m:SetFacing(0.45)
+        m:SetPortraitZoom(m.zoom or 0)
+        m:SetFacing(m.facing or 0.45)
     end)
     m:Show()
 end
@@ -955,11 +979,11 @@ SlashCmdList["OMNIUMOBSERVATOR"] = function(msg)
         if id then
             OO.db.showModel = true
             OO:UpdateModel(id)
-            print("|cFFFFCC00OmniumObservator|r model -> creature " .. id .. " (open the folio to see it)")
+            print("|cFFFFCC00OmniumObservator|r model -> creature " .. id .. " (open the folio; drag to rotate, scroll to zoom)")
         else
             OO.db.showModel = not OO.db.showModel
             OO:UpdateModel()
-            print("|cFFFFCC00OmniumObservator|r Decimus model " .. (OO.db.showModel and "on" or "off"))
+            print("|cFFFFCC00OmniumObservator|r Decimus model " .. (OO.db.showModel and "on (open folio: drag to rotate, scroll to zoom)" or "off"))
         end
     elseif cmd == "lock" then
         OO.db.locked = true
