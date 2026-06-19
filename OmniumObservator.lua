@@ -80,29 +80,17 @@ local DEFAULTS = {
     dockEnabled  = true,
 }
 
-function OO:GetAchievementData()
-    local _, _, _, overallDone, _, _, _, _, _, _, alreadyEarned =
-        GetAchievementInfo(ACH_OMNIUM_FOLIO)
-    local numCriteria = GetAchievementNumCriteria(ACH_OMNIUM_FOLIO)
-
-    local steps = {}
-    for i = 1, numCriteria do
-        local label, _, done = GetAchievementCriteriaInfo(ACH_OMNIUM_FOLIO, i)
-        steps[i] = {
-            name = (label ~= "" and label) or WEEK_NAMES[i] or ("Week " .. i),
-            done = done,
-        }
+-- Week unlock state is driven by the permanent quest-completion flags. The
+-- achievement 63325's criteria are NOT the five weekly unlocks (its first
+-- criterion is "Mote of Omnial Inquiry"), so we don't use them for the rows.
+function OO:GetWeeks()
+    local steps, unlocked = {}, 0
+    for i, q in ipairs(WEEKLY_QUESTS) do
+        local done = C_QuestLog.IsQuestFlaggedCompleted(q.id) and true or false
+        steps[i] = { name = q.name, done = done }
+        if done then unlocked = unlocked + 1 end
     end
-
-    -- Fill missing steps with fallback names
-    for i = #steps + 1, 5 do
-        steps[i] = { name = WEEK_NAMES[i] or ("Week " .. i), done = false }
-    end
-
-    return {
-        overall   = overallDone or alreadyEarned,
-        steps     = steps,
-    }
+    return { steps = steps, unlocked = unlocked, allDone = (unlocked >= 5) }
 end
 
 -- Auto-detects which of the 5 Seeking Knowledge weeks is current without any
@@ -291,6 +279,26 @@ function OO:TryHookFolio()
     if rof:IsShown() then self:OnFolioShown() end
 end
 
+-- The folio is LoadOnDemand and its RunesOfPowerFrame may be built a beat after
+-- the addon loads (or only on first open), so poll briefly until we catch it.
+function OO:ScheduleFolioHook()
+    if self.folioHooked then return end
+    self:TryHookFolio()
+    if self.folioHooked or self._folioPolling or not C_Timer then return end
+    self._folioPolling = true
+    local attempts = 0
+    local function poll()
+        attempts = attempts + 1
+        OO:TryHookFolio()
+        if OO.folioHooked or attempts >= 30 then
+            OO._folioPolling = false
+            return
+        end
+        C_Timer.After(1, poll)
+    end
+    C_Timer.After(1, poll)
+end
+
 function OO:OnFolioShown()
     if not self.db.dockEnabled or not self.dock then return end
     -- capture the live configID (it can change between sessions)
@@ -323,9 +331,9 @@ end
 
 -- Shared content builder — both panels render the same line list.
 function OO:BuildLines()
-    local achData = self:GetAchievementData()
-    local ws      = self:GetWeeklyState()
-    local lines   = {}
+    local weeks = self:GetWeeks()
+    local ws    = self:GetWeeklyState()
+    local lines = {}
 
     -- Folio resources (shown when the values are known)
     local motes = self:GetMotes()
@@ -345,21 +353,17 @@ function OO:BuildLines()
     end
     if motes or orbs or reset then lines[#lines + 1] = "sep" end
 
-    -- Overall achievement header + week progress
-    local unlocked = 0
-    for _, step in ipairs(achData.steps) do
-        if step.done then unlocked = unlocked + 1 end
-    end
-    if achData.overall then
+    -- Header + week progress (driven by permanent quest-completion flags)
+    if weeks.allDone then
         lines[#lines + 1] = "|c" .. PALETTE.gold .. "Omnium Folio Studies: |cFF66FF66COMPLETE|r"
     else
         lines[#lines + 1] = string.format(
-            "|c" .. PALETTE.gold .. "Omnium Folio|r  |cFFFFFFFF%d|r|c" .. PALETTE.dim .. "/5 weeks|r", unlocked)
+            "|c" .. PALETTE.gold .. "Omnium Folio|r  |cFFFFFFFF%d|r|c" .. PALETTE.dim .. "/5 weeks|r", weeks.unlocked)
     end
     lines[#lines + 1] = "sep"
 
-    -- 5 weekly rows (driven by achievement criteria), with check/bullet visuals
-    for _, step in ipairs(achData.steps) do
+    -- 5 weekly rows with check/bullet visuals
+    for _, step in ipairs(weeks.steps) do
         lines[#lines + 1] = string.format("%s |cFFCCCCCC%s|r", Check(step.done), step.name)
     end
 
@@ -511,7 +515,7 @@ ef:SetScript("OnEvent", function(self, event, ...)
             end
             OO:BuildUI()
             OO:BuildMinimapButton()
-            OO:TryHookFolio()  -- in case the folio addon is already loaded
+            OO:ScheduleFolioHook()  -- in case the folio addon is already loaded
             OO:Refresh()
             self:RegisterEvent("ACHIEVEMENT_EARNED")
             self:RegisterEvent("CRITERIA_UPDATE")
@@ -519,10 +523,10 @@ ef:SetScript("OnEvent", function(self, event, ...)
             self:RegisterEvent("UNIT_AURA")
             self:RegisterEvent("PLAYER_LOGOUT")
         elseif name == "Blizzard_ExpansionLandingPage" then
-            OO:TryHookFolio()
+            OO:ScheduleFolioHook()
         end
     elseif event == "PLAYER_ENTERING_WORLD" then
-        if OO.db then OO:TryHookFolio() end
+        if OO.db then OO:ScheduleFolioHook() end
     elseif event == "ACHIEVEMENT_EARNED" or event == "CRITERIA_UPDATE" or event == "QUEST_LOG_UPDATE" then
         OO:Refresh()
     elseif event == "UNIT_AURA" then
@@ -563,11 +567,29 @@ SlashCmdList["OMNIUMOBSERVATOR"] = function(msg)
         elseif OO.db.dockEnabled and OO.folioFrame and OO.folioFrame:IsShown() then
             OO:OnFolioShown()
         end
+    elseif cmd == "folio" then
+        print("|cFFFFCC00OmniumObservator|r folio frame path:")
+        local elp = _G.ExpansionLandingPage
+        print("  ExpansionLandingPage:", tostring(elp))
+        local ov  = elp and elp.Overlay
+        print("  .Overlay:", tostring(ov))
+        local mlo = ov and ov.MidnightLandingOverlay
+        print("  .MidnightLandingOverlay:", tostring(mlo))
+        local rof = mlo and mlo.RunesOfPowerFrame
+        print("  .RunesOfPowerFrame:", tostring(rof))
+        if C_AddOns and C_AddOns.IsAddOnLoaded then
+            print("  Blizzard_ExpansionLandingPage loaded:", tostring(C_AddOns.IsAddOnLoaded("Blizzard_ExpansionLandingPage")))
+        end
+        OO:ScheduleFolioHook()
+        print("  -> hooked:", tostring(OO.folioHooked), "configID:", tostring(OO.folioConfigID))
     elseif cmd == "debug" then
         print("|cFFFFCC00OmniumObservator|r " .. OO.version)
-        local achData = OO:GetAchievementData()
-        print("  Achievement " .. ACH_OMNIUM_FOLIO .. " complete:", tostring(achData.overall))
-        for i, step in ipairs(achData.steps) do
+        local _, achName, _, achDone = GetAchievementInfo(ACH_OMNIUM_FOLIO)
+        print(string.format("  Achievement %d (%s) completed=%s",
+            ACH_OMNIUM_FOLIO, tostring(achName), tostring(achDone)))
+        local weeks = OO:GetWeeks()
+        print(string.format("  Weeks unlocked: %d/5  allDone=%s", weeks.unlocked, tostring(weeks.allDone)))
+        for i, step in ipairs(weeks.steps) do
             print(string.format("  Week %d [%s] %s", i, step.done and "✓" or " ", step.name))
         end
         local ws = OO:GetWeeklyState()
