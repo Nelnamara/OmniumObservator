@@ -32,8 +32,11 @@ The dock is implemented: a branded companion panel anchored to the folio frame o
 - **Rune spell IDs:** Unleashed Fire `1279599`, Void-Touched Orbs `1279596`, Void-Tainted Shell `1279604`, Self-Mending `1279603`, Lynxlike Reflexes `1279605`, Lingering `1287555`, Overload `1279614`, Residual Energy `1279615`, Echoes `1279616`.
 - **Orb counter:** `C_UnitAuras.GetPlayerAuraBySpellID(1279596).applications` = live 0–5 (not secret; pcall-guarded anyway).
 
+### Voidforge economy IDs (wired in v1.0.4 embed)
+- Nebulous Voidcore = currency `3418` (`GetCurrency`). Ascendant Voidcore = ITEM `268552`, Ascendant Voidshard = ITEM `268650` (`GetItem` → `C_Item.GetItemCount(id,true,false,true,true)`). Feeding the Nilhammer = weekly quest `95269` (`IsQuestFlaggedCompleted`). The Ascendant Nilhammer = `95271`. Full list in the [[ref-midnight-ids]] memory.
+
 ### Next (roadmap)
-Decimus Voidstorm dashboard (bonus rolls: Voidforge/Nebulous Voidcores; Ascendant Nilhammer "Voidhammer" upgrades); slotted-rune readout via `C_Traits` node/entry info; optionally open the folio from the minimap button if a non-protected path exists.
+Nilhammer weekly *progress* (currently just done/not — the "3/3" needs the quest in log or an objective read); slotted-rune readout via `C_Traits` node/entry info; optionally open the folio from the minimap button if a non-protected path exists.
 
 ## Build / release / deploy
 - BigWigs packager on **`v*` tag push**. CurseForge secret: **`CURSFORGE_API_KEY`** (misspelled, leave as-is).

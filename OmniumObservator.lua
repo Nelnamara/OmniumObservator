@@ -42,6 +42,9 @@ local FOLIO_TREE_ID    = 1186
 local MOTES_CURRENCY   = 4230
 local RUNE_VOID_ORBS   = 1279596  -- Rune of Void-Touched Orbs; player aura stacks 0-5
 local NEBULOUS_VOIDCORE = 3418    -- bonus-roll currency (confirmed in-game via /oo scan)
+local ITEM_ASCENDANT_VOIDCORE  = 268552  -- gear-upgrade item
+local ITEM_ASCENDANT_VOIDSHARD = 268650  -- collected, forged into a Voidcore
+local QUEST_FEEDING_NILHAMMER  = 95269   -- weekly: catalyze the Hungering Oblivium
 
 -- Suite branding palette (purple / gold / black)
 local PALETTE = {
@@ -180,6 +183,20 @@ function OO:GetCurrency(id)
         if info and info.quantity then q = info.quantity end
     end)
     return q
+end
+
+-- Item count across bags + bank + reagent bank + warband bank (pcall-guarded).
+-- Used for Ascendant Voidcores / Voidshard (they're items, not currencies).
+function OO:GetItem(id)
+    local n
+    pcall(function()
+        if C_Item and C_Item.GetItemCount then
+            n = C_Item.GetItemCount(id, true, false, true, true)
+        elseif GetItemCount then
+            n = GetItemCount(id, true)
+        end
+    end)
+    return n
 end
 
 local ROW_H   = 18
@@ -436,6 +453,12 @@ function OO:BuildLeftLines()
     else
         lines[#lines + 1] = string.format("|c" .. PALETTE.dim .. "Start: %s (Silvermoon)|r", ws.name)
     end
+
+    -- Feeding the Nilhammer weekly (Voidforge progression)
+    local nilDone = false
+    pcall(function() nilDone = C_QuestLog.IsQuestFlaggedCompleted(QUEST_FEEDING_NILHAMMER) end)
+    lines[#lines + 1] = string.format("%s |cFFCCCCCCFeeding the Nilhammer|r", Check(nilDone))
+
     if reset then
         lines[#lines + 1] = string.format(
             "|c" .. PALETTE.dim .. "Weekly reset in|r |cFFFFFFFF%s|r", FmtDur(reset))
@@ -443,8 +466,7 @@ function OO:BuildLeftLines()
     return lines
 end
 
--- Right embedded panel: Voidstorm currencies + orbs.
--- (Ascendant Voidcores / Voidshard are items, not currencies — pending item IDs.)
+-- Right embedded panel: Voidstorm currencies, Ascendant items, and orbs.
 function OO:BuildRightLines()
     local lines = {}
     local motes = self:GetMotes()
@@ -453,6 +475,16 @@ function OO:BuildRightLines()
     local neb = self:GetCurrency(NEBULOUS_VOIDCORE)
     lines[#lines + 1] = string.format(
         "|c" .. PALETTE.purple .. "Bonus rolls:|r |cFFFFFFFF%s|r |c" .. PALETTE.dim .. "(Nebulous)|r", neb and tostring(neb) or "—")
+
+    lines[#lines + 1] = "sep"
+    local cores = self:GetItem(ITEM_ASCENDANT_VOIDCORE)
+    lines[#lines + 1] = string.format(
+        "|c" .. PALETTE.purple .. "Ascendant Voidcores:|r |cFFFFFFFF%s|r", cores and tostring(cores) or "0")
+    local shards = self:GetItem(ITEM_ASCENDANT_VOIDSHARD)
+    lines[#lines + 1] = string.format(
+        "|c" .. PALETTE.purple .. "Ascendant Voidshard:|r |cFFFFFFFF%s|r", shards and tostring(shards) or "0")
+
+    lines[#lines + 1] = "sep"
     local orbs = self:GetVoidOrbs()
     lines[#lines + 1] = string.format(
         "|c" .. PALETTE.purple .. "Void-Touched Orbs:|r |cFFFFFFFF%s|r|c" .. PALETTE.dim .. "/5|r", orbs and tostring(orbs) or "0")
