@@ -117,9 +117,19 @@ local RUNE_VOID_ORBS = 1279596  -- Rune of Void-Touched Orbs; player aura stacks
 
 -- Returns the current Void-Touched Orb count (0-5) if the rune's aura is up, else nil.
 function OO:GetVoidOrbs()
-    local aura = C_UnitAuras and C_UnitAuras.GetPlayerAuraBySpellID(RUNE_VOID_ORBS)
-    if not aura then return nil end
-    return aura.applications or 0
+    if not C_UnitAuras then return nil end
+    -- aura.applications could be a secret value if execution is tainted; read it
+    -- inside a pcall and only keep it once it survives a numeric compare (real
+    -- number). On failure we return nil so the orb line is simply hidden.
+    local n
+    pcall(function()
+        local aura = C_UnitAuras.GetPlayerAuraBySpellID(RUNE_VOID_ORBS)
+        if aura then
+            local a = aura.applications or 0
+            if a >= 0 then n = a end
+        end
+    end)
+    return n
 end
 
 function OO:BuildUI()
