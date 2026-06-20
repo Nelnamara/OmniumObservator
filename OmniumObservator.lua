@@ -992,7 +992,101 @@ local function OOConfigSlider(parent, name, label, lowTxt, highTxt, lo, hi, val,
     return s
 end
 
--- Simple options panel (no Ace): opacity, scale, lock, dock + minimap toggles.
+-- Native Blizzard Settings category (Game Menu > Options > AddOns). Built once,
+-- fully pcall-guarded — if the modern Settings API isn't there or errors, we fall
+-- back to the hand-rolled BuildConfig frame. Returns true if the category is ready.
+function OO:BuildSettings()
+    if self._settingsCat then return true end
+    if not (Settings and Settings.RegisterVerticalLayoutCategory and Settings.RegisterProxySetting) then
+        return false
+    end
+    local ok = pcall(function()
+        local category, layout = Settings.RegisterVerticalLayoutCategory("OmniumObservator")
+
+        local function chk(variable, name, default, get, set, tip)
+            local s = Settings.RegisterProxySetting(category, variable, Settings.VarType.Boolean, name, default, get, set)
+            Settings.CreateCheckbox(category, s, tip)
+        end
+        local function sld(variable, name, default, lo, hi, step, pct, get, set, tip)
+            local s = Settings.RegisterProxySetting(category, variable, Settings.VarType.Number, name, default, get, set)
+            local opts = Settings.CreateSliderOptions(lo, hi, step)
+            opts:SetLabelFormatter(MinimalSliderWithSteppersMixin.Label.Right, function(v)
+                if pct then return string.format("%d%%", math.floor(v * 100 + 0.5)) end
+                return tostring(math.floor(v * 100 + 0.5) / 100)
+            end)
+            Settings.CreateSlider(category, s, opts, tip)
+        end
+        local function header(text)
+            if layout and layout.AddInitializer and CreateSettingsListSectionHeaderInitializer then
+                layout:AddInitializer(CreateSettingsListSectionHeaderInitializer(text))
+            end
+        end
+
+        header("Appearance")
+        sld("OOalpha", "Background opacity", 0.9, 0, 1, 0.05, true,
+            function() return OO.db.alpha or 0.9 end,
+            function(v) OO.db.alpha = v; OO:ApplyAppearance() end,
+            "Panel background transparency. Text and icons stay fully opaque.")
+        sld("OOscale", "Standalone scale", 1.0, 0.7, 1.5, 0.05, true,
+            function() return OO.db.scale or 1.0 end,
+            function(v) OO.db.scale = v; OO:ApplyAppearance() end)
+        sld("OOfont", "Font size", 12, 8, 20, 1, false,
+            function() return OO.db.fontSize or 12 end,
+            function(v) OO.db.fontSize = v; OO:Refresh() end)
+        chk("OOwatermark", "Body watermark", true,
+            function() return OO.db.watermark ~= false end,
+            function(v) OO.db.watermark = v; OO:ApplyAppearance() end)
+
+        header("Folio panels")
+        chk("OOdock", "Folio dock enabled", true,
+            function() return OO.db.dockEnabled ~= false end,
+            function(v)
+                OO.db.dockEnabled = v
+                if not v then OO:OnFolioHidden()
+                elseif OO.folioFrame and OO.folioFrame:IsShown() then OO:OnFolioShown() end
+            end)
+        chk("OOguide", "Rune guide (Decimus's Counsel)", false,
+            function() return OO.db.showGuide == true end,
+            function(v) OO.db.showGuide = v; if OO.folioFrame and OO.folioFrame:IsShown() then OO:OnFolioShown() end end)
+        chk("OOlock", "Lock panel positions", false,
+            function() return OO.db.locked == true end,
+            function(v) OO.db.locked = v end)
+
+        header("Decimus")
+        chk("OOmodel", "Show Decimus model", false,
+            function() return OO.db.showModel == true end,
+            function(v) OO.db.showModel = v; if OO.folioFrame and OO.folioFrame:IsShown() then OO:UpdateModel() end end)
+        chk("OOmodellock", "Lock Decimus position", false,
+            function() return OO.db.modelLocked == true end,
+            function(v) OO.db.modelLocked = v end)
+        chk("OOvoice", "Decimus voice", true,
+            function() return OO.db.decimusVoice ~= false end,
+            function(v) OO.db.decimusVoice = v end)
+        sld("OOmodelsize", "Decimus size", 1.0, 0.5, 2.0, 0.05, true,
+            function() return OO.db.modelScale or 1.0 end,
+            function(v) OO.db.modelScale = v; if OO.model then OO.model:SetSize(240 * v, 340 * v) end end)
+
+        header("Minimap")
+        chk("OOminimap", "Show minimap button", true,
+            function() return not OO.db.minimapHide end,
+            function(v) OO.db.minimapHide = not v; if OO.minimapBtn then OO.minimapBtn:SetShown(v) end end)
+
+        Settings.RegisterAddOnCategory(category)
+        self._settingsCat = category
+    end)
+    return ok and self._settingsCat ~= nil
+end
+
+-- Open the native panel if available, else the custom frame fallback.
+function OO:OpenConfig(forceLegacy)
+    if not forceLegacy and self:BuildSettings() and Settings and Settings.OpenToCategory and self._settingsCat then
+        Settings.OpenToCategory(self._settingsCat:GetID())
+    else
+        self:BuildConfig()
+    end
+end
+
+-- Custom options panel (fallback, and /oo config legacy): opacity, scale, toggles.
 function OO:BuildConfig()
     if self.config then self.config:Show(); return end
     local f = CreateFrame("Frame", "OOConfigFrame", UIParent, "BackdropTemplate")
@@ -1109,7 +1203,7 @@ function OO:BuildMinimapButton()
 
     btn:SetScript("OnClick", function(_, button)
         if button == "RightButton" then
-            OO:BuildConfig()
+            OO:OpenConfig()
         elseif OO.frame then
             OO.frame:SetShown(not OO.frame:IsShown())
         end
@@ -1148,6 +1242,7 @@ ef:SetScript("OnEvent", function(self, event, ...)
             end
             OO:BuildUI()
             OO:BuildMinimapButton()
+            OO:BuildSettings()  -- register the native Options > AddOns category
             OO:ScheduleFolioHook()  -- in case the folio addon is already loaded
             OO:Refresh()
             self:RegisterEvent("ACHIEVEMENT_EARNED")
@@ -1270,7 +1365,7 @@ SlashCmdList["OMNIUMOBSERVATOR"] = function(msg)
                 q.id, q.week, tostring(C_QuestLog.IsQuestFlaggedCompleted(q.id))))
         end
     elseif cmd == "config" or cmd == "options" then
-        OO:BuildConfig()
+        OO:OpenConfig((arg or ""):lower() == "legacy")
     elseif cmd == "font" then
         local n = tonumber(arg)
         if n then
