@@ -918,7 +918,42 @@ function OO:CycleGuideRole(dir)
     self:GainFavor(1)
 end
 
+-- Weekly-unlock gem bar: the five rarity gems (common -> legendary) light up as
+-- the five Seeking Knowledge weeks unlock; locked weeks show desaturated + dim.
+-- Anchored along the panel's bottom edge. Built lazily on first update.
+local GEM_NAMES = { "common", "uncommon", "rare", "epic", "legendary" }
+function OO:BuildGemBar(panel)
+    if not panel or not panel.frame or panel.gems then return end
+    local sz, gap = 19, 5
+    local totalW = 5 * sz + 4 * gap
+    local gems = {}
+    for i = 1, 5 do
+        local t = panel.frame:CreateTexture(nil, "ARTWORK")
+        t:SetTexture("Interface\\AddOns\\OmniumObservator\\Media\\gem_" .. GEM_NAMES[i] .. ".png")
+        t:SetSize(sz, sz)
+        t:SetPoint("BOTTOM", panel.frame, "BOTTOM", -totalW / 2 + (sz / 2) + (i - 1) * (sz + gap), 7)
+        gems[i] = t
+    end
+    panel.gems = gems
+end
+
+function OO:UpdateGemBar(panel, unlocked)
+    if not panel or not panel.frame then return end
+    if not panel.gems then self:BuildGemBar(panel) end
+    local show = self.db.gemBar ~= false
+    for i = 1, 5 do
+        local t = panel.gems[i]
+        t:SetShown(show)
+        local lit = i <= (unlocked or 0)
+        t:SetDesaturated(not lit)
+        t:SetAlpha(lit and 1.0 or 0.28)
+    end
+end
+
 function OO:Refresh()
+    local unlocked = self:GetWeeks().unlocked
+    self:UpdateGemBar(self.panel, unlocked)
+    self:UpdateGemBar(self.dockL, unlocked)
     if self.panel and self.frame and self.frame:IsShown() then
         self:RenderLines(self.panel, self:BuildLines())
     end
