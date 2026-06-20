@@ -375,7 +375,7 @@ end
 
 function OO:CreatePanel(name, strata, titleText, showLogo)
     local f = CreateFrame("Frame", name, UIParent, "BackdropTemplate")
-    local headerH = showLogo and 60 or TITLE_H
+    local headerH = 70   -- generous so the ornate banner fits on every panel
     f:SetSize(FRAME_W, headerH + ROW_H * 9 + PAD * 2)
     f:SetFrameStrata(strata or "MEDIUM")
     f:SetClampedToScreen(true)
@@ -400,14 +400,15 @@ function OO:CreatePanel(name, strata, titleText, showLogo)
     skin:SetShown(OO.db == nil or OO.db.frameSkin ~= false)
     f.skin = skin
 
-    -- Ornate Voidstorm title plate across the header (main panels only). Sliced so
-    -- the scrollwork ends stay crisp while the void center stretches to width.
-    if showLogo then
+    -- Ornate Voidstorm title plate across EVERY panel's header. Sliced so the
+    -- scrollwork ends stay crisp while the void center stretches to width; height
+    -- is user-tunable (db.bannerH) so it can match the chosen font size.
+    do
         local hb = f:CreateTexture(nil, "BACKGROUND", nil, 2)
         hb:SetTexture("Interface\\AddOns\\OmniumObservator\\Media\\banner.tga")
         hb:SetPoint("TOPLEFT", f, "TOPLEFT", 1, -1)
         hb:SetPoint("TOPRIGHT", f, "TOPRIGHT", -1, -1)
-        hb:SetHeight(headerH + 2)
+        hb:SetHeight((OO.db and OO.db.bannerH) or 62)
         pcall(function()
             if hb.SetTextureSliceMargins then
                 hb:SetTextureSliceMargins(120, 50, 120, 50)
@@ -428,12 +429,12 @@ function OO:CreatePanel(name, strata, titleText, showLogo)
 
     local title = f:CreateFontString(nil, "OVERLAY", showLogo and "GameFontNormalLarge" or "GameFontNormalSmall")
     if showLogo then
-        -- Void-sorceress emblem in the header (s1_06).
+        -- Void-sorceress emblem in the header (s1_06) — main panels only, larger.
         local logo = f:CreateTexture(nil, "ARTWORK")
-        logo:SetSize(46, 46)
-        logo:SetPoint("TOPLEFT", f, "TOPLEFT", PAD, -3)
+        logo:SetSize(62, 62)
+        logo:SetPoint("TOPLEFT", f, "TOPLEFT", PAD - 4, -2)
         logo:SetTexture("Interface\\AddOns\\OmniumObservator\\Media\\heroine.tga")
-        title:SetPoint("LEFT", logo, "RIGHT", 7, 0)
+        title:SetPoint("LEFT", logo, "RIGHT", 6, 0)
     else
         title:SetPoint("TOPLEFT", f, "TOPLEFT", PAD + 2, -5)
     end
@@ -543,16 +544,26 @@ function OO:SaveDockPos(panel, key)
     end
 end
 
--- A small [+]/[-] in the header that collapses/expands the weekly list.
+-- A [+]/[-] in the header that collapses/expands the weekly list. Given its own
+-- dark plate so it stays legible sitting on top of the ornate banner.
 function OO:AddCollapseButton(panel)
-    local b = CreateFrame("Button", nil, panel.frame)
-    b:SetSize(20, 20)
-    b:SetPoint("TOPRIGHT", panel.frame, "TOPRIGHT", -6, -3)
-    b:SetFrameLevel(panel.frame:GetFrameLevel() + 5)
+    local b = CreateFrame("Button", nil, panel.frame, "BackdropTemplate")
+    b:SetSize(22, 22)
+    b:SetPoint("TOPRIGHT", panel.frame, "TOPRIGHT", -8, -6)
+    b:SetFrameLevel(panel.frame:GetFrameLevel() + 8)
+    b:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8x8",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", edgeSize = 10,
+        insets = { left = 2, right = 2, top = 2, bottom = 2 },
+    })
+    b:SetBackdropColor(0.05, 0.02, 0.12, 0.9)
+    b:SetBackdropBorderColor(unpack(PALETTE.border))
     local t = b:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    t:SetAllPoints()
+    t:SetPoint("CENTER", 0, 1)
     t:SetText(OO.db.weeksCollapsed and "+" or "-")
     b.text = t
+    b:SetScript("OnEnter", function(s) s:SetBackdropBorderColor(1, 0.85, 0.2) end)
+    b:SetScript("OnLeave", function(s) s:SetBackdropBorderColor(unpack(PALETTE.border)) end)
     b:SetScript("OnClick", function()
         OO.db.weeksCollapsed = not OO.db.weeksCollapsed
         OO:UpdateCollapseButtons()
@@ -1070,6 +1081,7 @@ function OO:ApplyAppearance()
         if p.frame.headerBanner then
             p.frame.headerBanner:SetShown(bannerOn)
             p.frame.headerBanner:SetAlpha(math.max(0.65, bgA))
+            p.frame.headerBanner:SetHeight(self.db.bannerH or 62)
         end
         if p.frame.watermark then p.frame.watermark:SetAlpha(wmOn and (0.11 * bgA) or 0) end
     end
@@ -1330,6 +1342,8 @@ function OO:BuildConfig()
         function(v) db.scale = v; OO:ApplyAppearance() end)
     A.slider("OOcfgFont", "Font size", "8", "20", 8, 20, db.fontSize or 12,
         function(v) db.fontSize = math.floor(v + 0.5); OO:Refresh() end, 1)
+    A.slider("OOcfgBanner", "Banner size", "S", "L", 44, 70, db.bannerH or 62,
+        function(v) db.bannerH = math.floor(v + 0.5); OO:ApplyAppearance() end, 1)
     A.gap()
     A.check("Void frame skin", db.frameSkin ~= false, function(v) db.frameSkin = v; OO:ApplyAppearance() end)
     A.check("Ornate header banner", db.headerBanner ~= false, function(v) db.headerBanner = v; OO:ApplyAppearance() end)
