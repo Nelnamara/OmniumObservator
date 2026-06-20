@@ -375,7 +375,7 @@ end
 
 function OO:CreatePanel(name, strata, titleText, showLogo)
     local f = CreateFrame("Frame", name, UIParent, "BackdropTemplate")
-    local headerH = showLogo and 52 or TITLE_H
+    local headerH = showLogo and 60 or TITLE_H
     f:SetSize(FRAME_W, headerH + ROW_H * 9 + PAD * 2)
     f:SetFrameStrata(strata or "MEDIUM")
     f:SetClampedToScreen(true)
@@ -399,6 +399,24 @@ function OO:CreatePanel(name, strata, titleText, showLogo)
     OO:ApplySkinGeometry(f, skin)
     skin:SetShown(OO.db == nil or OO.db.frameSkin ~= false)
     f.skin = skin
+
+    -- Ornate Voidstorm title plate across the header (main panels only). Sliced so
+    -- the scrollwork ends stay crisp while the void center stretches to width.
+    if showLogo then
+        local hb = f:CreateTexture(nil, "BACKGROUND", nil, 2)
+        hb:SetTexture("Interface\\AddOns\\OmniumObservator\\Media\\banner.png")
+        hb:SetPoint("TOPLEFT", f, "TOPLEFT", 1, -1)
+        hb:SetPoint("TOPRIGHT", f, "TOPRIGHT", -1, -1)
+        hb:SetHeight(headerH + 2)
+        pcall(function()
+            if hb.SetTextureSliceMargins then
+                hb:SetTextureSliceMargins(120, 50, 120, 50)
+                if Enum and Enum.UITextureSliceMode then hb:SetTextureSliceMode(Enum.UITextureSliceMode.Stretched) end
+            end
+        end)
+        hb:SetShown(OO.db == nil or OO.db.headerBanner ~= false)
+        f.headerBanner = hb
+    end
 
     -- Faint void-sorceress watermark embedded in the panel body (low alpha, corner).
     local mark = f:CreateTexture(nil, "BACKGROUND", nil, 1)
@@ -1025,6 +1043,7 @@ function OO:ApplyAppearance()
     local r, g, b = PALETTE.bg[1], PALETTE.bg[2], PALETTE.bg[3]
     local wmOn = self.db.watermark ~= false
     local skinOn = self.db.frameSkin ~= false
+    local bannerOn = self.db.headerBanner ~= false
     local function apply(p)
         if not p or not p.frame then return end
         p.frame:SetAlpha(1)
@@ -1032,6 +1051,10 @@ function OO:ApplyAppearance()
         if p.frame.skin then
             p.frame.skin:SetShown(skinOn)
             p.frame.skin:SetAlpha(bgA)
+        end
+        if p.frame.headerBanner then
+            p.frame.headerBanner:SetShown(bannerOn)
+            p.frame.headerBanner:SetAlpha(math.max(0.65, bgA))
         end
         if p.frame.watermark then p.frame.watermark:SetAlpha(wmOn and (0.11 * bgA) or 0) end
     end
@@ -1537,6 +1560,10 @@ SlashCmdList["OMNIUMOBSERVATOR"] = function(msg)
             if p and p.frame and p.frame.skin then OO:ApplySkinGeometry(p.frame, p.frame.skin) end
         end
         OO:ApplyAppearance()
+    elseif cmd == "banner" then
+        OO.db.headerBanner = ((arg or ""):lower() ~= "off")
+        OO:ApplyAppearance()
+        print("|cFFFFCC00OmniumObservator|r header banner " .. (OO.db.headerBanner and "on" or "off"))
     elseif cmd == "reset" then
         OO.db.x, OO.db.y = 400, 200
         OO.frame:ClearAllPoints()
