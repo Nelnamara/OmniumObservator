@@ -628,17 +628,19 @@ function OO:UpdateModel(creatureOverride)
         -- Speech bubble above his head.
         local bubble = CreateFrame("Frame", nil, m, "BackdropTemplate")
         bubble:SetPoint("BOTTOM", m, "TOP", 0, -2)
-        bubble:SetSize(200, 56)
+        bubble:SetSize(220, 72)
+        -- Authentic WoW chat-bubble artwork (rounded speech-bubble look).
         bubble:SetBackdrop({
-            bgFile = "Interface\\Buttons\\WHITE8x8",
-            edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-            tile = false, edgeSize = 12, insets = { left = 4, right = 4, top = 4, bottom = 4 },
+            bgFile = "Interface\\Tooltips\\CHATBUBBLE-BACKGROUND",
+            edgeFile = "Interface\\Tooltips\\CHATBUBBLE-BACKDROP",
+            tile = true, tileSize = 16, edgeSize = 16,
+            insets = { left = 16, right = 16, top = 16, bottom = 16 },
         })
-        bubble:SetBackdropColor(0.05, 0.02, 0.10, 0.94)
+        bubble:SetBackdropColor(0.06, 0.03, 0.12, 0.95)
         bubble:SetBackdropBorderColor(unpack(PALETTE.border))
         local bt = bubble:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-        bt:SetPoint("TOPLEFT", 7, -6)
-        bt:SetPoint("BOTTOMRIGHT", -7, 6)
+        bt:SetPoint("TOPLEFT", 15, -13)
+        bt:SetPoint("BOTTOMRIGHT", -15, 13)
         bt:SetJustifyH("LEFT")
         bt:SetWordWrap(true)
         bubble:Hide()
