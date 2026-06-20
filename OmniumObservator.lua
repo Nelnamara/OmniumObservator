@@ -389,7 +389,7 @@ function OO:CreatePanel(name, strata, titleText, showLogo)
     -- invisible; the void-skin below is the real art and acts as a fallback bg
     -- if a client lacks the 9-slice API.
     f:SetBackdropColor(0, 0, 0, 0)
-    f:SetBackdropBorderColor(0, 0, 0, 0)
+    f:SetBackdropBorderColor(unpack(PALETTE.border))   -- purple edge (solid-bg + border fallback while the 9-slice skin is off)
 
     -- Void panel skin: one opaque texture = void background + rounded purple
     -- frame, 9-sliced so corners stay crisp at any panel size. db.alpha fades it
@@ -397,7 +397,7 @@ function OO:CreatePanel(name, strata, titleText, showLogo)
     local skin = f:CreateTexture(nil, "BACKGROUND", nil, 0)
     skin:SetTexture("Interface\\AddOns\\OmniumObservator\\Media\\border.tga")
     OO:ApplySkinGeometry(f, skin)
-    skin:SetShown(OO.db == nil or OO.db.frameSkin ~= false)
+    skin:SetShown(OO.db ~= nil and OO.db.frameSkin == true)   -- off by default: 9-slice render issue on Midnight (tomorrow)
     f.skin = skin
 
     -- Ornate Voidstorm title plate across EVERY panel's header. Sliced so the
@@ -1068,7 +1068,7 @@ function OO:ApplyAppearance()
     local sc  = self.db.scale or 1.0
     local r, g, b = PALETTE.bg[1], PALETTE.bg[2], PALETTE.bg[3]
     local wmOn = self.db.watermark ~= false
-    local skinOn = self.db.frameSkin ~= false
+    local skinOn = self.db.frameSkin == true   -- off by default until the 9-slice skin renders right
     local bannerOn = self.db.headerBanner ~= false
     local function apply(p)
         if not p or not p.frame then return end
@@ -1203,8 +1203,8 @@ function OO:BuildSettings()
             function(v) OO.db.modelScale = v; if OO.model then OO.model:SetSize(240 * v, 340 * v) end end)
 
         header("Theme")
-        chk("OOskin", "Void frame skin", true,
-            function() return OO.db.frameSkin ~= false end,
+        chk("OOskin", "Void frame skin (experimental)", false,
+            function() return OO.db.frameSkin == true end,
             function(v) OO.db.frameSkin = v; OO:ApplyAppearance() end)
         chk("OObanner", "Ornate header banner", true,
             function() return OO.db.headerBanner ~= false end,
@@ -1345,7 +1345,7 @@ function OO:BuildConfig()
     A.slider("OOcfgBanner", "Banner size", "S", "L", 44, 70, db.bannerH or 62,
         function(v) db.bannerH = math.floor(v + 0.5); OO:ApplyAppearance() end, 1)
     A.gap()
-    A.check("Void frame skin", db.frameSkin ~= false, function(v) db.frameSkin = v; OO:ApplyAppearance() end)
+    A.check("Void frame skin (experimental)", db.frameSkin == true, function(v) db.frameSkin = v; OO:ApplyAppearance() end)
     A.check("Ornate header banner", db.headerBanner ~= false, function(v) db.headerBanner = v; OO:ApplyAppearance() end)
     A.check("Body watermark (sorceress)", db.watermark ~= false, function(v) db.watermark = v; OO:ApplyAppearance() end)
     A.check("Weekly gem progress bar", db.gemBar ~= false, function(v) db.gemBar = v; OO:ApplyAppearance() end)
