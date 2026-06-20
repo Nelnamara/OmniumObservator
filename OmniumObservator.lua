@@ -400,21 +400,21 @@ function OO:CreatePanel(name, strata, titleText, showLogo)
     skin:SetShown(OO.db == nil or OO.db.frameSkin ~= false)
     f.skin = skin
 
-    -- Faint mascot watermark embedded in the panel body (low alpha, corner).
+    -- Faint void-sorceress watermark embedded in the panel body (low alpha, corner).
     local mark = f:CreateTexture(nil, "BACKGROUND", nil, 1)
-    mark:SetTexture("Interface\\AddOns\\OmniumObservator\\Media\\mascot.png")
-    mark:SetSize(96, 96)
-    mark:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -6, 6)
-    mark:SetAlpha(0.07)
+    mark:SetTexture("Interface\\AddOns\\OmniumObservator\\Media\\heroine.png")
+    mark:SetSize(124, 124)
+    mark:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -10, 8)
+    mark:SetAlpha(0.10)
     f.watermark = mark
 
     local title = f:CreateFontString(nil, "OVERLAY", showLogo and "GameFontNormalLarge" or "GameFontNormalSmall")
     if showLogo then
-        -- Larger mascot portrait (the high-res CurseForge art) in the header.
+        -- Void-sorceress emblem in the header (s1_06).
         local logo = f:CreateTexture(nil, "ARTWORK")
-        logo:SetSize(44, 44)
-        logo:SetPoint("TOPLEFT", f, "TOPLEFT", PAD, -4)
-        logo:SetTexture("Interface\\AddOns\\OmniumObservator\\Media\\mascot.png")
+        logo:SetSize(46, 46)
+        logo:SetPoint("TOPLEFT", f, "TOPLEFT", PAD, -3)
+        logo:SetTexture("Interface\\AddOns\\OmniumObservator\\Media\\heroine.png")
         title:SetPoint("LEFT", logo, "RIGHT", 7, 0)
     else
         title:SetPoint("TOPLEFT", f, "TOPLEFT", PAD + 2, -5)
@@ -1033,7 +1033,7 @@ function OO:ApplyAppearance()
             p.frame.skin:SetShown(skinOn)
             p.frame.skin:SetAlpha(bgA)
         end
-        if p.frame.watermark then p.frame.watermark:SetAlpha(wmOn and (0.07 * bgA) or 0) end
+        if p.frame.watermark then p.frame.watermark:SetAlpha(wmOn and (0.11 * bgA) or 0) end
     end
     apply(self.panel)
     apply(self.dockL)
