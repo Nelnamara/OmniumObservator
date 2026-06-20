@@ -395,7 +395,7 @@ function OO:CreatePanel(name, strata, titleText, showLogo)
     -- frame, 9-sliced so corners stay crisp at any panel size. db.alpha fades it
     -- (background-only; text/icons stay opaque).
     local skin = f:CreateTexture(nil, "BACKGROUND", nil, 0)
-    skin:SetTexture("Interface\\AddOns\\OmniumObservator\\Media\\border.png")
+    skin:SetTexture("Interface\\AddOns\\OmniumObservator\\Media\\border.tga")
     OO:ApplySkinGeometry(f, skin)
     skin:SetShown(OO.db == nil or OO.db.frameSkin ~= false)
     f.skin = skin
@@ -404,7 +404,7 @@ function OO:CreatePanel(name, strata, titleText, showLogo)
     -- the scrollwork ends stay crisp while the void center stretches to width.
     if showLogo then
         local hb = f:CreateTexture(nil, "BACKGROUND", nil, 2)
-        hb:SetTexture("Interface\\AddOns\\OmniumObservator\\Media\\banner.png")
+        hb:SetTexture("Interface\\AddOns\\OmniumObservator\\Media\\banner.tga")
         hb:SetPoint("TOPLEFT", f, "TOPLEFT", 1, -1)
         hb:SetPoint("TOPRIGHT", f, "TOPRIGHT", -1, -1)
         hb:SetHeight(headerH + 2)
@@ -420,7 +420,7 @@ function OO:CreatePanel(name, strata, titleText, showLogo)
 
     -- Faint void-sorceress watermark embedded in the panel body (low alpha, corner).
     local mark = f:CreateTexture(nil, "BACKGROUND", nil, 1)
-    mark:SetTexture("Interface\\AddOns\\OmniumObservator\\Media\\heroine.png")
+    mark:SetTexture("Interface\\AddOns\\OmniumObservator\\Media\\heroine.tga")
     mark:SetSize(124, 124)
     mark:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -10, 8)
     mark:SetAlpha(0.10)
@@ -432,7 +432,7 @@ function OO:CreatePanel(name, strata, titleText, showLogo)
         local logo = f:CreateTexture(nil, "ARTWORK")
         logo:SetSize(46, 46)
         logo:SetPoint("TOPLEFT", f, "TOPLEFT", PAD, -3)
-        logo:SetTexture("Interface\\AddOns\\OmniumObservator\\Media\\heroine.png")
+        logo:SetTexture("Interface\\AddOns\\OmniumObservator\\Media\\heroine.tga")
         title:SetPoint("LEFT", logo, "RIGHT", 7, 0)
     else
         title:SetPoint("TOPLEFT", f, "TOPLEFT", PAD + 2, -5)
@@ -962,7 +962,7 @@ function OO:BuildGemBar(panel)
     local gems = {}
     for i = 1, 5 do
         local t = panel.frame:CreateTexture(nil, "ARTWORK")
-        t:SetTexture("Interface\\AddOns\\OmniumObservator\\Media\\gem_" .. GEM_NAMES[i] .. ".png")
+        t:SetTexture("Interface\\AddOns\\OmniumObservator\\Media\\gem_" .. GEM_NAMES[i] .. ".tga")
         t:SetSize(sz, sz)
         t:SetPoint("BOTTOM", panel.frame, "BOTTOM", -totalW / 2 + (sz / 2) + (i - 1) * (sz + gap), 7)
         gems[i] = t
@@ -1406,7 +1406,7 @@ function OO:BuildMinimapButton()
     -- Self-contained round icon (gold ring baked in) — SetAllPoints centers it cleanly.
     local icon = btn:CreateTexture(nil, "ARTWORK")
     icon:SetAllPoints()
-    icon:SetTexture("Interface\\AddOns\\OmniumObservator\\Media\\minimap.png")
+    icon:SetTexture("Interface\\AddOns\\OmniumObservator\\Media\\minimap.tga")
 
     btn:SetPoint("CENTER", Minimap, "CENTER", OOAngleOffset(db.minimapAngle or 225))
 
