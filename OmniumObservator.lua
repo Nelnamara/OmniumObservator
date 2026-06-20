@@ -86,9 +86,20 @@ local DECIMUS_RARE = {
     "Steal the Mantle of Predation, enter a Nexus-Point, and weaken the storm. Terminas will be humiliated.",
 }
 
--- Decimus voice-over FileDataIDs (Wowhead sound=NNNNN -> playable via PlaySoundFile).
--- Pattern: VO_120_Decimus_NN_M. Add more IDs from Wowhead's Decimus "Sounds" tab.
-local DECIMUS_SOUNDS = { 327617 }
+-- Decimus voice-over FileDataIDs (the "Copy ID" value on Wowhead's Sounds tab,
+-- NOT the sound=NNNNN entry id). Pattern VO_120_Decimus_NN_M; line NN noted below.
+-- Add more from the Sounds tab as transcribed. /oo voice <id> appends one live.
+local DECIMUS_SOUNDS = {
+    7248472,  -- VO_120_Decimus_22_M
+    7303103,  -- VO_120_Decimus_61_M
+    7303106,  -- VO_120_Decimus_62_M
+    7325673,  -- VO_120_Decimus_64_M
+    7325674,  -- VO_120_Decimus_65_M
+    7325675,  -- VO_120_Decimus_66_M
+    7325676,  -- VO_120_Decimus_67_M
+    7325677,  -- VO_120_Decimus_68_M
+    7329680,  -- VO_120_Decimus_69_M
+}
 
 -- Omnium Folio rune spell IDs (for real icons in the Counsel panel).
 local RUNE_IDS = {
