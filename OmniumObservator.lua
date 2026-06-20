@@ -867,11 +867,13 @@ function OO:BuildLeftLines()
     end
 
     -- Feeding the Nilhammer weekly (Voidforge progression)
-    local nilDone = false
-    pcall(function() nilDone = C_QuestLog.IsQuestFlaggedCompleted(QUEST_FEEDING_NILHAMMER) end)
-    lines[#lines + 1] = string.format("%s |cFFCCCCCCFeeding the Nilhammer|r", Check(nilDone))
+    if self.db.showNilhammer ~= false then
+        local nilDone = false
+        pcall(function() nilDone = C_QuestLog.IsQuestFlaggedCompleted(QUEST_FEEDING_NILHAMMER) end)
+        lines[#lines + 1] = string.format("%s |cFFCCCCCCFeeding the Nilhammer|r", Check(nilDone))
+    end
 
-    if reset then
+    if reset and self.db.showReset ~= false then
         lines[#lines + 1] = string.format(
             "|c" .. PALETTE.dim .. "Weekly reset in|r |cFFFFFFFF%s|r", FmtDur(reset))
     end
@@ -881,36 +883,49 @@ end
 -- Right embedded panel: Voidstorm currencies, Ascendant items, and orbs.
 function OO:BuildRightLines()
     local lines = {}
-    local motes = self:GetMotes()
-    lines[#lines + 1] = string.format(
-        "|c" .. PALETTE.gold .. "Motes:|r |cFFFFFFFF%s|r", motes and tostring(motes) or "—")
-    local neb, nebMax = self:GetCurrency(NEBULOUS_VOIDCORE)
-    local nebStr = neb and tostring(neb) or "—"
-    if neb and nebMax and nebMax > 0 then nebStr = neb .. "|c" .. PALETTE.dim .. "/" .. nebMax .. "|r" end
-    lines[#lines + 1] = string.format(
-        "%s|c" .. PALETTE.purple .. "Bonus rolls:|r |cFFFFFFFF%s|r |c" .. PALETTE.dim .. "(Nebulous)|r",
-        IconTag(self:CurrencyIcon(NEBULOUS_VOIDCORE)), nebStr)
+    local db = self.db
+    local function sep() if #lines > 0 and lines[#lines] ~= "sep" then lines[#lines + 1] = "sep" end end
 
-    lines[#lines + 1] = "sep"
-    local cores = self:GetItem(ITEM_ASCENDANT_VOIDCORE)
-    lines[#lines + 1] = string.format(
-        "%s|c" .. PALETTE.purple .. "Ascendant Voidcores:|r |cFFFFFFFF%s|r",
-        IconTag(self:ItemIcon(ITEM_ASCENDANT_VOIDCORE)), cores and tostring(cores) or "0")
-    local shards = self:GetItem(ITEM_ASCENDANT_VOIDSHARD)
-    lines[#lines + 1] = string.format(
-        "%s|c" .. PALETTE.purple .. "Ascendant Voidshard:|r |cFFFFFFFF%s|r",
-        IconTag(self:ItemIcon(ITEM_ASCENDANT_VOIDSHARD)), shards and tostring(shards) or "0")
-
-    -- Void-Touched Orbs: only shown when the rune is actually active (its aura is
-    -- present = you're specced into it). When the slotted-rune readout lands this
-    -- becomes "whichever resource rune you've chosen in the tree".
-    local orbs = self:GetVoidOrbs()
-    if orbs then
-        lines[#lines + 1] = "sep"
+    if db.showMotes ~= false then
+        local motes = self:GetMotes()
         lines[#lines + 1] = string.format(
-            "%s|c" .. PALETTE.purple .. "Void-Touched Orbs:|r |cFFFFFFFF%d|r|c" .. PALETTE.dim .. "/5|r",
-            IconTag(self:SpellIcon(RUNE_VOID_ORBS)), orbs)
+            "|c" .. PALETTE.gold .. "Motes:|r |cFFFFFFFF%s|r", motes and tostring(motes) or "—")
     end
+    if db.showRolls ~= false then
+        local neb, nebMax = self:GetCurrency(NEBULOUS_VOIDCORE)
+        local nebStr = neb and tostring(neb) or "—"
+        if neb and nebMax and nebMax > 0 then nebStr = neb .. "|c" .. PALETTE.dim .. "/" .. nebMax .. "|r" end
+        lines[#lines + 1] = string.format(
+            "%s|c" .. PALETTE.purple .. "Bonus rolls:|r |cFFFFFFFF%s|r |c" .. PALETTE.dim .. "(Nebulous)|r",
+            IconTag(self:CurrencyIcon(NEBULOUS_VOIDCORE)), nebStr)
+    end
+
+    if db.showVoidcores ~= false or db.showVoidshard ~= false then sep() end
+    if db.showVoidcores ~= false then
+        local cores = self:GetItem(ITEM_ASCENDANT_VOIDCORE)
+        lines[#lines + 1] = string.format(
+            "%s|c" .. PALETTE.purple .. "Ascendant Voidcores:|r |cFFFFFFFF%s|r",
+            IconTag(self:ItemIcon(ITEM_ASCENDANT_VOIDCORE)), cores and tostring(cores) or "0")
+    end
+    if db.showVoidshard ~= false then
+        local shards = self:GetItem(ITEM_ASCENDANT_VOIDSHARD)
+        lines[#lines + 1] = string.format(
+            "%s|c" .. PALETTE.purple .. "Ascendant Voidshard:|r |cFFFFFFFF%s|r",
+            IconTag(self:ItemIcon(ITEM_ASCENDANT_VOIDSHARD)), shards and tostring(shards) or "0")
+    end
+
+    -- Void-Touched Orbs: only shown when the rune is active (its aura is present).
+    if db.showOrbs ~= false then
+        local orbs = self:GetVoidOrbs()
+        if orbs then
+            sep()
+            lines[#lines + 1] = string.format(
+                "%s|c" .. PALETTE.purple .. "Void-Touched Orbs:|r |cFFFFFFFF%d|r|c" .. PALETTE.dim .. "/5|r",
+                IconTag(self:SpellIcon(RUNE_VOID_ORBS)), orbs)
+        end
+    end
+
+    if #lines == 0 then lines[#lines + 1] = "|c" .. PALETTE.dim .. "(rows hidden in options)|r" end
     return lines
 end
 
@@ -1077,12 +1092,12 @@ local function OOConfigCheck(parent, label, x, y, checked, onClick)
     return cb
 end
 
-local function OOConfigSlider(parent, name, label, lowTxt, highTxt, lo, hi, val, y, onChange)
+local function OOConfigSlider(parent, name, label, lowTxt, highTxt, lo, hi, val, y, onChange, step)
     local s = CreateFrame("Slider", name, parent, "OptionsSliderTemplate")
     s:SetWidth(230)
     s:SetPoint("TOP", 0, y)
     s:SetMinMaxValues(lo, hi)
-    s:SetValueStep(0.05)
+    s:SetValueStep(step or 0.05)
     s:SetObeyStepOnDrag(true)
     s:SetValue(val)
     -- Region names vary across client versions — guard so a missing one can't
@@ -1092,8 +1107,12 @@ local function OOConfigSlider(parent, name, label, lowTxt, highTxt, lo, hi, val,
     local text = _G[name .. "Text"] or s.Text
     if low  then low:SetText(lowTxt) end
     if high then high:SetText(highTxt) end
-    if text then text:SetText(label) end
-    s:SetScript("OnValueChanged", function(_, v) onChange(v) end)
+    local function fmt(v) if (step or 0.05) >= 1 then return tostring(math.floor(v + 0.5)) else return string.format("%.2f", v) end end
+    if text then text:SetText(label .. "  |cFFFFD200" .. fmt(val) .. "|r") end
+    s:SetScript("OnValueChanged", function(_, v)
+        if text then text:SetText(label .. "  |cFFFFD200" .. fmt(v) .. "|r") end
+        onChange(v)
+    end)
     return s
 end
 
@@ -1171,6 +1190,36 @@ function OO:BuildSettings()
             function() return OO.db.modelScale or 1.0 end,
             function(v) OO.db.modelScale = v; if OO.model then OO.model:SetSize(240 * v, 340 * v) end end)
 
+        header("Theme")
+        chk("OOskin", "Void frame skin", true,
+            function() return OO.db.frameSkin ~= false end,
+            function(v) OO.db.frameSkin = v; OO:ApplyAppearance() end)
+        chk("OObanner", "Ornate header banner", true,
+            function() return OO.db.headerBanner ~= false end,
+            function(v) OO.db.headerBanner = v; OO:ApplyAppearance() end)
+        chk("OOgembar", "Weekly gem progress bar", true,
+            function() return OO.db.gemBar ~= false end,
+            function(v) OO.db.gemBar = v; OO:ApplyAppearance() end)
+        chk("OOcollapse", "Collapse weekly list", false,
+            function() return OO.db.weeksCollapsed == true end,
+            function(v) OO.db.weeksCollapsed = v; OO:Refresh() end)
+
+        header("Content rows")
+        chk("OOmotes", "Motes of Omnial Inquiry", true,
+            function() return OO.db.showMotes ~= false end, function(v) OO.db.showMotes = v; OO:Refresh() end)
+        chk("OOrolls", "Nebulous bonus rolls", true,
+            function() return OO.db.showRolls ~= false end, function(v) OO.db.showRolls = v; OO:Refresh() end)
+        chk("OOcores", "Ascendant Voidcores", true,
+            function() return OO.db.showVoidcores ~= false end, function(v) OO.db.showVoidcores = v; OO:Refresh() end)
+        chk("OOshard", "Ascendant Voidshard", true,
+            function() return OO.db.showVoidshard ~= false end, function(v) OO.db.showVoidshard = v; OO:Refresh() end)
+        chk("OOorbs", "Void-Touched Orbs", true,
+            function() return OO.db.showOrbs ~= false end, function(v) OO.db.showOrbs = v; OO:Refresh() end)
+        chk("OOnil", "Feeding the Nilhammer", true,
+            function() return OO.db.showNilhammer ~= false end, function(v) OO.db.showNilhammer = v; OO:Refresh() end)
+        chk("OOresettimer", "Weekly reset timer", true,
+            function() return OO.db.showReset ~= false end, function(v) OO.db.showReset = v; OO:Refresh() end)
+
         header("Minimap")
         chk("OOminimap", "Show minimap button", true,
             function() return not OO.db.minimapHide end,
@@ -1182,20 +1231,21 @@ function OO:BuildSettings()
     return ok and self._settingsCat ~= nil
 end
 
--- Open the native panel if available, else the custom frame fallback.
-function OO:OpenConfig(forceLegacy)
-    if not forceLegacy and self:BuildSettings() and Settings and Settings.OpenToCategory and self._settingsCat then
+-- /oo config opens the rich tabbed window. The native Settings category is still
+-- registered (Options > AddOns), and /oo config blizzard jumps to it.
+function OO:OpenConfig(blizzard)
+    if blizzard and self:BuildSettings() and Settings and Settings.OpenToCategory and self._settingsCat then
         Settings.OpenToCategory(self._settingsCat:GetID())
     else
         self:BuildConfig()
     end
 end
 
--- Custom options panel (fallback, and /oo config legacy): opacity, scale, toggles.
+-- Custom tabbed options window: Appearance / Panels / Decimus / Content.
 function OO:BuildConfig()
     if self.config then self.config:Show(); return end
     local f = CreateFrame("Frame", "OOConfigFrame", UIParent, "BackdropTemplate")
-    f:SetSize(310, 430)
+    f:SetSize(366, 458)
     f:SetPoint("CENTER")
     f:SetFrameStrata("DIALOG")
     f:SetToplevel(true)
@@ -1220,54 +1270,119 @@ function OO:BuildConfig()
     local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     title:SetPoint("TOP", 0, -10)
     title:SetText("|c" .. PALETTE.title .. "OmniumObservator|r options")
-
     local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
     close:SetPoint("TOPRIGHT", 2, 2)
     close:SetScript("OnClick", function() f:Hide() end)
 
-    OOConfigSlider(f, "OOConfigOpacity", "Background opacity", "0%", "100%", 0.0, 1.0, self.db.alpha or 0.9, -52,
-        function(v) OO.db.alpha = v; OO:ApplyAppearance() end)
-    OOConfigSlider(f, "OOConfigScale", "Scale (standalone)", "70%", "150%", 0.7, 1.5, self.db.scale or 1.0, -98,
-        function(v) OO.db.scale = v; OO:ApplyAppearance() end)
-    OOConfigSlider(f, "OOConfigModel", "Decimus size", "S", "L", 0.5, 2.0, self.db.modelScale or 1.0, -144,
-        function(v) OO.db.modelScale = v; if OO.model then OO.model:SetSize(190 * v, 270 * v) end end)
+    -- Tab bar + content panes (only the active pane is shown).
+    local tabNames = { "Appearance", "Panels", "Decimus", "Content" }
+    f.panes, f.tabs = {}, {}
+    local function ShowTab(idx)
+        for i, p in ipairs(f.panes) do p:SetShown(i == idx) end
+        for i, b in ipairs(f.tabs) do
+            b.bg:SetColorTexture(i == idx and 0.34 or 0.10, i == idx and 0.12 or 0.05, i == idx and 0.52 or 0.18, 0.9)
+        end
+    end
+    local TW = 84
+    for i, name in ipairs(tabNames) do
+        local b = CreateFrame("Button", nil, f)
+        b:SetSize(TW, 22)
+        b:SetPoint("TOPLEFT", f, "TOPLEFT", 10 + (i - 1) * (TW + 2), -32)
+        local bg = b:CreateTexture(nil, "BACKGROUND"); bg:SetAllPoints(); b.bg = bg
+        local fs = b:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall"); fs:SetPoint("CENTER"); fs:SetText(name)
+        b:SetScript("OnClick", function() ShowTab(i) end)
+        f.tabs[i] = b
+    end
 
-    -- Reset Decimus to his default spot
-    local reset = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
-    reset:SetSize(120, 18)
-    reset:SetPoint("TOP", 0, -178)
-    reset:SetText("Reset Decimus pos")
-    reset:SetScript("OnClick", function()
-        OO.db.modelPos = nil
-        if OO.folioFrame and OO.folioFrame:IsShown() then OO:UpdateModel() end
+    local function newPane()
+        local p = CreateFrame("Frame", nil, f)
+        p:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -58)
+        p:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", 0, 12)
+        p:Hide()
+        f.panes[#f.panes + 1] = p
+        return p
+    end
+    local function layout(pane)
+        local y = { -10 }
+        return {
+            slider = function(nm, label, lo_t, hi_t, lo, hi, val, onChange, step)
+                OOConfigSlider(pane, nm, label, lo_t, hi_t, lo, hi, val, y[1], onChange, step); y[1] = y[1] - 44
+            end,
+            check = function(label, checked, onClick)
+                OOConfigCheck(pane, label, 22, y[1], checked, onClick); y[1] = y[1] - 25
+            end,
+            button = function(label, onClick)
+                local b = CreateFrame("Button", nil, pane, "UIPanelButtonTemplate")
+                b:SetSize(170, 18); b:SetPoint("TOP", 0, y[1]); b:SetText(label)
+                b:SetScript("OnClick", onClick); y[1] = y[1] - 26
+            end,
+            gap = function(n) y[1] = y[1] - (n or 8) end,
+        }
+    end
+    local db = self.db
+    local function folioRefresh() if OO.folioFrame and OO.folioFrame:IsShown() then OO:OnFolioShown() end end
+
+    -- Appearance (global look / theme)
+    local A = layout(newPane())
+    A.slider("OOcfgOpacity", "Background opacity", "0%", "100%", 0, 1, db.alpha or 0.9,
+        function(v) db.alpha = v; OO:ApplyAppearance() end)
+    A.slider("OOcfgScale", "Panel scale", "70%", "150%", 0.7, 1.5, db.scale or 1.0,
+        function(v) db.scale = v; OO:ApplyAppearance() end)
+    A.slider("OOcfgFont", "Font size", "8", "20", 8, 20, db.fontSize or 12,
+        function(v) db.fontSize = math.floor(v + 0.5); OO:Refresh() end, 1)
+    A.gap()
+    A.check("Void frame skin", db.frameSkin ~= false, function(v) db.frameSkin = v; OO:ApplyAppearance() end)
+    A.check("Ornate header banner", db.headerBanner ~= false, function(v) db.headerBanner = v; OO:ApplyAppearance() end)
+    A.check("Body watermark (sorceress)", db.watermark ~= false, function(v) db.watermark = v; OO:ApplyAppearance() end)
+    A.check("Weekly gem progress bar", db.gemBar ~= false, function(v) db.gemBar = v; OO:ApplyAppearance() end)
+
+    -- Panels (folio embed behaviour)
+    local P = layout(newPane())
+    P.check("Folio dock enabled", db.dockEnabled ~= false, function(v)
+        db.dockEnabled = v
+        if not v then OO:OnFolioHidden() else folioRefresh() end
+    end)
+    P.check("Rune guide (Decimus's Counsel)", db.showGuide == true, function(v) db.showGuide = v; folioRefresh() end)
+    P.check("Collapse weekly list", db.weeksCollapsed == true, function(v) db.weeksCollapsed = v; OO:Refresh() end)
+    P.check("Lock panel positions", db.locked == true, function(v) db.locked = v end)
+    P.check("Show minimap button", not db.minimapHide, function(v)
+        db.minimapHide = not v; if OO.minimapBtn then OO.minimapBtn:SetShown(v) end
+    end)
+    P.gap()
+    P.button("Reset all panel positions", function()
+        db.x, db.y = 400, 200
+        db.dockLPos, db.dockRPos, db.dockGuidePos = nil, nil, nil
+        if OO.frame then OO.frame:ClearAllPoints(); OO.frame:SetPoint("CENTER", UIParent, "CENTER", 400, 200) end
+        folioRefresh()
     end)
 
-    OOConfigCheck(f, "Lock position", 28, -206, self.db.locked, function(v) OO.db.locked = v end)
-    OOConfigCheck(f, "Folio dock enabled", 28, -232, self.db.dockEnabled, function(v)
-        OO.db.dockEnabled = v
-        if not v then OO:OnFolioHidden()
-        elseif OO.folioFrame and OO.folioFrame:IsShown() then OO:OnFolioShown() end
+    -- Decimus
+    local D = layout(newPane())
+    D.slider("OOcfgModel", "Decimus size", "S", "L", 0.5, 2.0, db.modelScale or 1.0,
+        function(v) db.modelScale = v; if OO.model then OO.model:SetSize(240 * v, 340 * v) end end)
+    D.gap()
+    D.check("Show Decimus model", db.showModel == true, function(v)
+        db.showModel = v; if OO.folioFrame and OO.folioFrame:IsShown() then OO:UpdateModel() end
     end)
-    OOConfigCheck(f, "Show Decimus model", 28, -258, self.db.showModel, function(v)
-        OO.db.showModel = v
-        if OO.folioFrame and OO.folioFrame:IsShown() then OO:UpdateModel() end
-    end)
-    OOConfigCheck(f, "Decimus voice (plays his lines)", 28, -284, self.db.decimusVoice ~= false, function(v)
-        OO.db.decimusVoice = v
-    end)
-    OOConfigCheck(f, "Show rune guide (Decimus's Counsel)", 28, -310, self.db.showGuide, function(v)
-        OO.db.showGuide = v
-        if OO.folioFrame and OO.folioFrame:IsShown() then OO:OnFolioShown() end
-    end)
-    OOConfigCheck(f, "Body watermark", 28, -336, self.db.watermark ~= false, function(v)
-        OO.db.watermark = v
-        OO:ApplyAppearance()
-    end)
-    OOConfigCheck(f, "Show minimap button", 28, -362, not self.db.minimapHide, function(v)
-        OO.db.minimapHide = not v
-        if OO.minimapBtn then OO.minimapBtn:SetShown(v) end
+    D.check("Lock Decimus position", db.modelLocked == true, function(v) db.modelLocked = v end)
+    D.check("Decimus voice (plays his lines)", db.decimusVoice ~= false, function(v) db.decimusVoice = v end)
+    D.gap()
+    D.button("Reset Decimus position", function()
+        db.modelPos = nil; if OO.folioFrame and OO.folioFrame:IsShown() then OO:UpdateModel() end
     end)
 
+    -- Content (which data rows to show)
+    local C = layout(newPane())
+    C.check("Motes of Omnial Inquiry", db.showMotes ~= false, function(v) db.showMotes = v; OO:Refresh() end)
+    C.check("Nebulous bonus rolls", db.showRolls ~= false, function(v) db.showRolls = v; OO:Refresh() end)
+    C.check("Ascendant Voidcores", db.showVoidcores ~= false, function(v) db.showVoidcores = v; OO:Refresh() end)
+    C.check("Ascendant Voidshard", db.showVoidshard ~= false, function(v) db.showVoidshard = v; OO:Refresh() end)
+    C.check("Void-Touched Orbs", db.showOrbs ~= false, function(v) db.showOrbs = v; OO:Refresh() end)
+    C.gap()
+    C.check("Feeding the Nilhammer", db.showNilhammer ~= false, function(v) db.showNilhammer = v; OO:Refresh() end)
+    C.check("Weekly reset timer", db.showReset ~= false, function(v) db.showReset = v; OO:Refresh() end)
+
+    ShowTab(1)
     self.config = f
 end
 
@@ -1470,7 +1585,7 @@ SlashCmdList["OMNIUMOBSERVATOR"] = function(msg)
                 q.id, q.week, tostring(C_QuestLog.IsQuestFlaggedCompleted(q.id))))
         end
     elseif cmd == "config" or cmd == "options" then
-        OO:OpenConfig((arg or ""):lower() == "legacy")
+        OO:OpenConfig((arg or ""):lower() == "blizzard")
     elseif cmd == "font" then
         local n = tonumber(arg)
         if n then
