@@ -46,6 +46,11 @@ local ITEM_ASCENDANT_VOIDCORE  = 268552  -- gear-upgrade item
 local ITEM_ASCENDANT_VOIDSHARD = 268650  -- collected, forged into a Voidcore
 local QUEST_FEEDING_NILHAMMER  = 95269   -- weekly: catalyze the Hungering Oblivium
 local NPC_DECIMUS              = 235697   -- Domanaar Decimus (for the 3D model)
+local NPC_TERMINAS            = 235767   -- "Lord" Terminas (Decimus's rival)
+-- Easter egg: extra models unlocked after enough Decimus interactions OR the
+-- Omnium Folio Studies achievement. Cycle with /oo model next. Extensible.
+local BONUS_MODELS = { 235697, 235767 }
+local FAVOR_THRESHOLD = 25
 
 -- Suite branding palette (void purple / gold accents / black)
 local PALETTE = {
@@ -618,7 +623,7 @@ function OO:UpdateModel(creatureOverride)
     if not self.model then
         local m = CreateFrame("PlayerModel", "OODecimusModel", UIParent)
         m:SetFrameStrata("FULLSCREEN_DIALOG")  -- floats over everything (movable)
-        m:SetSize(190, 270)
+        m:SetSize(240, 340)
         m:SetMovable(true)
         m:EnableMouse(true)
         m:EnableMouseWheel(true)
@@ -670,7 +675,7 @@ function OO:UpdateModel(creatureOverride)
             s.zoom = math.max(0, math.min(0.9, (s.zoom or 0) + delta * 0.1))
             pcall(function() s:SetPortraitZoom(s.zoom) end)
         end)
-        m:SetScript("OnDragStart", function(s) s:StartMoving() end)
+        m:SetScript("OnDragStart", function(s) if not OO.db.modelLocked then s:StartMoving() end end)
         m:SetScript("OnDragStop", function(s) s:StopMovingOrSizing(); OO:SaveModelPos() end)
         m:SetScript("OnModelLoaded", function(s)
             pcall(function() s:SetPortraitZoom(s.zoom or 0); s:SetFacing(s.facing or 0.45) end)
@@ -679,13 +684,13 @@ function OO:UpdateModel(creatureOverride)
     end
     local m = self.model
     local ms = self.db.modelScale or 1.0
-    m:SetSize(190 * ms, 270 * ms)
+    m:SetSize(240 * ms, 340 * ms)
     m:ClearAllPoints()
     local mp = self.db.modelPos
     if mp then m:SetPoint("BOTTOMLEFT", self.folioFrame, "BOTTOMLEFT", mp.x, mp.y)
     else m:SetPoint("BOTTOMLEFT", self.folioFrame, "BOTTOMLEFT", 36, 30) end
     pcall(function()
-        m:SetCreature(creatureOverride or NPC_DECIMUS)
+        m:SetCreature(creatureOverride or self.db.modelCreature or NPC_DECIMUS)
         m:SetPortraitZoom(m.zoom or 0)
         m:SetFacing(m.facing or 0.45)
     end)
@@ -725,6 +730,7 @@ end
 
 -- Click handler with a hidden easter egg: 7 quick clicks unlocks a rare line.
 function OO:DecimusClicked()
+    self:GainFavor(1)
     local now = GetTime()
     if now - (self._decClickAt or 0) > 2 then self._decClicks = 0 end
     self._decClicks = (self._decClicks or 0) + 1
@@ -734,6 +740,20 @@ function OO:DecimusClicked()
         self:DecimusSpeak(true)
     else
         self:DecimusSpeak(false)
+    end
+end
+
+-- Earn "favor" by clicking Decimus / tabbing rune builds. Enough favor — or the
+-- Omnium Folio Studies achievement — unlocks the bonus model roster (egg).
+function OO:GainFavor(n)
+    if self.db.modelsUnlocked then return end
+    self.db.decimusFavor = (self.db.decimusFavor or 0) + (n or 1)
+    local achDone = false
+    pcall(function() local _, _, _, d = GetAchievementInfo(ACH_OMNIUM_FOLIO); achDone = d end)
+    if self.db.decimusFavor >= FAVOR_THRESHOLD or achDone then
+        self.db.modelsUnlocked = true
+        print("|cFFFFCC00OmniumObservator|r |cFFA335EEThe void yields its servants...|r new models unlocked! Use |cFFFFFFFF/oo model next|r to cycle them.")
+        self:DecimusSpeak(true)
     end
 end
 
@@ -853,6 +873,7 @@ function OO:CycleGuideRole(dir)
     local n = #ROLE_BUILDS
     self.db.guideRole = ((self.db.guideRole or 3) - 1 + (dir or 1)) % n + 1
     self:Refresh()
+    self:GainFavor(1)
 end
 
 function OO:Refresh()
@@ -1274,7 +1295,20 @@ SlashCmdList["OMNIUMOBSERVATOR"] = function(msg)
         print("|cFFFFCC00OmniumObservator|r Counsel build: " .. (ROLE_BUILDS[OO.db.guideRole or 3].role))
     elseif cmd == "model" then
         local id = tonumber(arg)
-        if id then
+        if (arg or ""):lower() == "next" then
+            if not OO.db.modelsUnlocked then
+                print("|cFFFFCC00OmniumObservator|r more models are locked — earn Decimus's favor first.")
+            else
+                local cur = OO.db.modelCreature or NPC_DECIMUS
+                local idx = 1
+                for i, c in ipairs(BONUS_MODELS) do if c == cur then idx = i end end
+                OO.db.modelCreature = BONUS_MODELS[idx % #BONUS_MODELS + 1]
+                OO.db.showModel = true
+                OO:UpdateModel()
+                print("|cFFFFCC00OmniumObservator|r model -> creature " .. OO.db.modelCreature)
+            end
+        elseif id then
+            OO.db.modelCreature = id
             OO.db.showModel = true
             OO:UpdateModel(id)
             print("|cFFFFCC00OmniumObservator|r model -> creature " .. id .. " (open the folio; drag to rotate, scroll to zoom)")
