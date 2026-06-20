@@ -354,6 +354,25 @@ local PAD     = 6
 -- Builds a backdrop panel (branded) with a header (optional logo) + title, a
 -- divider, and pooled line/separator widgets. Returns { frame, linePool, sepPool }.
 -- Shared by the standalone panel and the two embedded folio panels.
+-- Position + 9-slice the void-skin texture on a panel. Pulled out so /oo border
+-- can re-tune margin/outset live. Outset makes the frame's window line up with
+-- the panel's content area; 9-slice keeps the corners crisp at any size.
+function OO:ApplySkinGeometry(frame, skin)
+    local m = (self.db and self.db.skinMargin) or 70
+    local o = (self.db and self.db.skinOutset) or 14
+    skin:ClearAllPoints()
+    skin:SetPoint("TOPLEFT", frame, "TOPLEFT", -o, o)
+    skin:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", o, -o)
+    pcall(function()
+        if skin.SetTextureSliceMargins then
+            skin:SetTextureSliceMargins(m, m, m, m)
+            if Enum and Enum.UITextureSliceMode then
+                skin:SetTextureSliceMode(Enum.UITextureSliceMode.Stretched)
+            end
+        end
+    end)
+end
+
 function OO:CreatePanel(name, strata, titleText, showLogo)
     local f = CreateFrame("Frame", name, UIParent, "BackdropTemplate")
     local headerH = showLogo and 52 or TITLE_H
@@ -366,8 +385,20 @@ function OO:CreatePanel(name, strata, titleText, showLogo)
         tile = false, edgeSize = 12,
         insets = { left = 3, right = 3, top = 3, bottom = 3 },
     })
-    f:SetBackdropColor(unpack(PALETTE.bg))
-    f:SetBackdropBorderColor(unpack(PALETTE.border))
+    -- Old backdrop kept (template gives us SetClampedToScreen etc.) but made
+    -- invisible; the void-skin below is the real art and acts as a fallback bg
+    -- if a client lacks the 9-slice API.
+    f:SetBackdropColor(0, 0, 0, 0)
+    f:SetBackdropBorderColor(0, 0, 0, 0)
+
+    -- Void panel skin: one opaque texture = void background + rounded purple
+    -- frame, 9-sliced so corners stay crisp at any panel size. db.alpha fades it
+    -- (background-only; text/icons stay opaque).
+    local skin = f:CreateTexture(nil, "BACKGROUND", nil, 0)
+    skin:SetTexture("Interface\\AddOns\\OmniumObservator\\Media\\border.png")
+    OO:ApplySkinGeometry(f, skin)
+    skin:SetShown(OO.db == nil or OO.db.frameSkin ~= false)
+    f.skin = skin
 
     -- Faint mascot watermark embedded in the panel body (low alpha, corner).
     local mark = f:CreateTexture(nil, "BACKGROUND", nil, 1)
@@ -958,10 +989,15 @@ function OO:ApplyAppearance()
     local sc  = self.db.scale or 1.0
     local r, g, b = PALETTE.bg[1], PALETTE.bg[2], PALETTE.bg[3]
     local wmOn = self.db.watermark ~= false
+    local skinOn = self.db.frameSkin ~= false
     local function apply(p)
         if not p or not p.frame then return end
         p.frame:SetAlpha(1)
         if p.frame.SetBackdropColor then p.frame:SetBackdropColor(r, g, b, bgA) end
+        if p.frame.skin then
+            p.frame.skin:SetShown(skinOn)
+            p.frame.skin:SetAlpha(bgA)
+        end
         if p.frame.watermark then p.frame.watermark:SetAlpha(wmOn and (0.07 * bgA) or 0) end
     end
     apply(self.panel)
@@ -1445,6 +1481,27 @@ SlashCmdList["OMNIUMOBSERVATOR"] = function(msg)
     elseif cmd == "unlock" then
         OO.db.locked = false
         print("|cFFFFCC00OmniumObservator|r unlocked.")
+    elseif cmd == "border" or cmd == "skin" then
+        -- Live-tune the void frame skin: /oo border <margin> <outset> | on | off
+        local a1, a2 = (arg or ""):match("^(%S*)%s*(%S*)")
+        if a1 == "off" then
+            OO.db.frameSkin = false
+            print("|cFFFFCC00OmniumObservator|r void frame skin OFF")
+        elseif a1 == "on" or a1 == "" then
+            OO.db.frameSkin = true
+            print(string.format("|cFFFFCC00OmniumObservator|r void frame skin ON (margin=%d outset=%d). Tune: /oo border 60 18",
+                OO.db.skinMargin or 70, OO.db.skinOutset or 14))
+        else
+            local m, o = tonumber(a1), tonumber(a2)
+            if m then OO.db.skinMargin = m end
+            if o then OO.db.skinOutset = o end
+            OO.db.frameSkin = true
+            print(string.format("|cFFFFCC00OmniumObservator|r skin margin=%d outset=%d", OO.db.skinMargin or 70, OO.db.skinOutset or 14))
+        end
+        for _, p in ipairs({ OO.panel, OO.dockL, OO.dockR, OO.dockGuide }) do
+            if p and p.frame and p.frame.skin then OO:ApplySkinGeometry(p.frame, p.frame.skin) end
+        end
+        OO:ApplyAppearance()
     elseif cmd == "reset" then
         OO.db.x, OO.db.y = 400, 200
         OO.frame:ClearAllPoints()
