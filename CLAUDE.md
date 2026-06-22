@@ -49,7 +49,15 @@ Nilhammer weekly *progress* (currently just done/not — the "3/3" needs the que
 ## Build / release / deploy
 - BigWigs packager on **`v*` tag push**. CurseForge secret: **`CURSFORGE_API_KEY`** (misspelled, leave as-is).
 - Local test: copy to `D:\World of Warcraft\_retail_\Interface\AddOns\OmniumObservator\`.
-- Current version: **1.0.4** (Interface 120007) — released to CurseForge (tag `v1.0.4`). Huge release: in-folio embed (3 panels), Voidforge economy, voiced/movable Decimus model, role-based rune Counsel (Folio guide + Method.gg), rarity weeks, options panel, collapsible weeks, font/opacity controls. Next (v1.0.5): curved-corner + void-bg art, per-class stat picks, full voiced Decimus (VO↔text pairs), Prey Hunts/Spark/catalyst, Voidhammer forge bar.
+- **1.0.4** (released, tag `v1.0.4`): in-folio embed (3 panels), Voidforge economy, voiced/movable Decimus model, role-based rune Counsel, rarity weeks, options panel, collapsible weeks, font/opacity controls.
+- Current version: **1.0.5** (Interface 120007, **in dev — not yet tagged**). Themed-art update: **texture-picker menus** (CDTL3-style) for 3 sets — **Frame style** (`border1..5.tga`, default F13), **Forge bar style** (`forge1..5.tga`, default M12), **Divider style** (`divider1..5.tga`, default V12); all keyed-from-green PixAI art. **Void panel frame is now ON by default** — the old broken 9-slice `border.tga` was removed and replaced with clean thin frames (slice margin 48, tuned to 256px art). New **Nilhammer forge bar** widget (ornate frame + fill, reads weekly feed) and **glowing void-line dividers** (replace the plain purple rule). New config **Theme tab** (5 tabs now, window 400 wide) + native-Settings parity; slash `/oo frame <1-5>`. Still TODO for 1.0.5: per-class stat picks, full voiced Decimus (VO↔text pairs), Prey Hunts/Spark/catalyst.
+
+### Themed-art picker architecture (v1.0.5)
+- `OO:FrameTexPath/ForgeTexPath/DividerTexPath()` map `db.frameTex/forgeTex/dividerTex` (1..5) → `Media\<name><N>.tga`. `MEDIA` local constant near `ApplySkinGeometry`.
+- Panel skin (`CreatePanel`) `SetTexture(OO:FrameTexPath())`; `ApplyAppearance` re-applies texture + `ApplySkinGeometry` on every refresh so dropdowns swap live. `db.frameSkin ~= false` (default on).
+- Forge bar: `BuildForgeBar`/`UpdateForgeBar` (mirrors gem bar), bottom-anchored on `self.panel` + `dockL`, fill from `GetNilhammerState()` (done flag, or live quest-objective fraction if in log). `RenderLines` reserves bottom space for gem + forge bars.
+- Dividers: `StyleSeps(panel)` textures the pooled `sepPool` with `DividerTexPath()` (or the plain rule if `db.dividerArt == false`); called in `CreatePanel` + `ApplyAppearance`.
+- Config: `layout().selector(label, count, cur, onChange)` = taint-free `< N / count >` cycler (not UIDropDownMenu). Theme tab holds all art toggles + the 3 selectors.
 
 ## Conventions
 - **Never** append a `Co-Authored-By` trailer to commits.

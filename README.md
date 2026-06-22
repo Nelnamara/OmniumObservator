@@ -2,29 +2,44 @@
 
 > **WoW:** 12.0.7+ (Midnight) · **Maintainer:** Nelnamara
 
-OmniumObservator embeds **inside the Omnium Folio frame** — the patch 12.0.7 weekly rune system — and tracks everything around it: your weekly rune unlocks, the Decimus Voidstorm economy (Motes, bonus rolls, Ascendant Voidcores/Voidshard), recommended rune builds, and the weekly reset. It also brings Decimus himself into the frame as an interactive, fully voiced 3D model. A standalone panel is available too, for an at-a-glance view without opening the folio.
+OmniumObservator embeds **inside the Omnium Folio frame** — the 12.0.7 weekly rune system — and tracks everything around it: your weekly rune unlocks, the Decimus Voidstorm economy (Motes, bonus rolls, Ascendant Voidcores/Voidshard, Void Assaults), recommended rune builds, the Nilhammer forge, and the weekly reset. It brings Decimus himself into the frame as an interactive, voiced 3D model — and the more you use it, the more of the Void's cast you unlock. A standalone glance panel is available too, for an at-a-glance read without opening the folio.
 
 ---
 
 ## Features
 
-- **In-folio embed** — when you open the Omnium Folio, OmniumObservator anchors draggable panels inside it, flanking the rune tree:
-  - **This week** — folio progress, the 5 weekly runes (colored by loot rarity), the current/next Seeking Knowledge quest, Feeding the Nilhammer, and the weekly reset countdown
-  - **Voidstorm** — Motes of Omnial Inquiry, Nebulous bonus rolls (held/weekly cap), Ascendant Voidcores + Voidshard, and your live Void-Touched Orbs (shown when you're specced into that rune)
-  - **Decimus's Counsel** *(optional)* — recommended rune builds with real rune icons
-- **Rarity-colored weeks** — the 5 weekly runes light up white → green → blue → purple → orange (common → legendary) as the ladder fills
-- **Decimus, in person** — an interactive 3D Decimus model you can summon into the folio: **left-drag** to rotate, **scroll** to zoom, **right-drag** to move him. He speaks his real in-game voice lines (with a text bubble) on open and when clicked
-- **Rune advisor** — "Decimus's Counsel" cycles 8 recommended builds from two sources: the **Omnium Folio guide** (M+ / Raid ST / Raid DoT / PvP / Casual) and **Method.gg** (DPS / M+ / Raid DoT). They agree on most rows and differ on the core rune, so you can compare
-- **Standalone panel** — the same info in a movable, lockable window for a quick glance without opening the folio
-- **Options panel** — opacity, scale, font size, Decimus size, and a stack of toggles, all in one place
-- **Minimap button** — left-click toggles the panel, right-click opens options
+- **In-folio embed** — open the Omnium Folio and OmniumObservator anchors draggable panels inside it, flanking the rune tree:
+  - **This Week** — folio progress, the 5 weekly runes (colored by loot rarity), the current/next *Seeking Knowledge* quest, the **Nilhammer forge** bar, the **weekly-quest gem bar**, and the weekly reset countdown
+  - **Devouring Watch** — the full Voidstorm economy: Motes of Omnial Inquiry, Nebulous bonus rolls (held / weekly cap), Ascendant Voidcores + Voidshard, and **live Void Assaults** (Eversong / Zul'Aman) with their weekly status
+  - **Omnium Counsel** *(optional)* — recommended rune builds with real rune icons, plus your **Void Favor** standing
+- **Rarity-colored weeks** — the weekly list reads at a glance: **completed** weeks glow in their loot-rarity color (white → green → blue → purple → orange), the week **up next** matches the amber "Next:" line, and the rest stay gray
+- **The Nilhammer forge** — a forge-progress bar tracks your one-time Voidforge build, then repurposes to your live Nebulous Voidcore cap once the Ascendant Nilhammer is forged
+- **Decimus, in person** — an interactive 3D model you can summon into the folio: **left-drag** to rotate, **scroll** to zoom, **right-drag** to move him. He greets you with his real in-game voice line (and a text bubble) when the folio opens and when you click him
+- **Void Favor & the Void's cast** — every bit of folio progress earns **Void Favor**, and favor unlocks new advisors to summon in Decimus's place: **Terminas**, **Riko**, and eventually **yourself**. And if you've drawn the wrong kind of attention... someone else may show up uninvited
+- **Rune advisor** — Omnium Counsel cycles recommended builds from two sources: the **Omnium Folio guide** (M+ / Raid ST / Raid DoT / PvP / Casual) and **Method.gg** (DPS / M+ / Raid DoT), so you can compare the core-rune choices side by side
+- **Hover tooltips everywhere** — mouse a resource row for its native game tooltip, or a progress gem for that week's quest info — without changing the clean panel layout
+- **Standalone glance panel** — the same info in a movable, lockable window, with its **own opacity and frame style** independent of the docked panels
+- **Deep appearance control** — per-panel width/height, per-edge background fill, frame style/size/thickness/offset, banners, glowing dividers, forge-fill color/glow, gem size/glow, mascot show/undock, watermark opacity, and a panel title color — all live in `/oo config`
+- **Per-character profiles** — every setting saves per character by default, with profile copy/reset and shareable **import/export** strings
+- **Minimap button** — left-click toggles the standalone panel, right-click opens options
+
+---
+
+## Void Favor & advisors
+
+OmniumObservator keeps a running **Void Favor** count — a little easter-egg standing that grows as you engage with the folio:
+
+- Opening the folio (once per day) and clicking Decimus (a few times per day, with diminishing returns) earn favor
+- Each newly unlocked week, forging the Ascendant Nilhammer, and completing the *Omnium Folio Studies* achievement give larger one-time boosts
+
+As your favor climbs, you unlock alternate advisors to summon in Decimus's place — each a fully posed 3D model with its own voice. And once you're deep enough into the folio, **Xal'atath** takes a passing interest: she'll occasionally hijack the model frame to insult you — and once you've filled all five weeks, she's been known to shove a couple of your panels out of place for fun. (A quick *Reset all panel positions* puts them right back.)
 
 ---
 
 ## Requirements
 
 - WoW Midnight 12.0.7+
-- No library dependencies
+- No external dependencies (all libraries are bundled)
 
 ---
 
@@ -36,70 +51,79 @@ Drop the `OmniumObservator` folder into `World of Warcraft\_retail_\Interface\Ad
 
 ## Usage
 
-No setup needed. OmniumObservator auto-detects which of the five "Seeking Knowledge" weeks is current (the weeks are permanent one-time unlocks, so it infers progress from completed quests). Just log in, open the **Omnium Folio**, and the panels appear. `/oo` toggles the standalone panel.
+No setup needed. OmniumObservator auto-detects which of the five *Seeking Knowledge* weeks is current (they're permanent one-time unlocks, so progress is inferred from completed quests). Log in, open the **Omnium Folio**, and the panels appear. `/oo` toggles the standalone glance panel.
 
-### Slash Commands
+### Slash commands
 
-- **`/oo`** — Toggle the standalone panel
-- **`/oo config`** — Open the options panel
-- **`/oo dock`** — Toggle the in-folio dock
-- **`/oo build [role]`** — Cycle the recommended rune build, or set one (`m+`, `raid`, `dot`, `pvp`, `casual`, `method`)
-- **`/oo font <8-20>`** — Set the panel font size
-- **`/oo model`** — Toggle the Decimus 3D model
-- **`/oo voice`** — Toggle Decimus's voice lines
-- **`/oo lock`** / **`/oo unlock`** — Lock or unlock frame dragging
-- **`/oo reset`** — Reset the standalone panel position
+| Command | What it does |
+| --- | --- |
+| `/oo` | Toggle the standalone glance panel |
+| `/oo config` *(or `options`)* | Open the options window |
+| `/oo dock` | Toggle the in-folio docked panels |
+| `/oo build [role]` | Cycle the recommended rune build, or set one: `m+`, `raid`, `dot`, `pvp`, `casual`, `method` |
+| `/oo model` | Toggle the Decimus 3D model |
+| `/oo voice` | Toggle advisor voice lines |
+| `/oo font <8–20>` | Set the panel font size |
+| `/oo frame <1–5>` | Switch the ornate frame style |
+| `/oo banner <1–6>` | Switch the panel banner style |
+| `/oo lock` / `/oo unlock` | Lock or unlock frame dragging |
+| `/oo reset` | Reset all panel positions |
 
-### Options Panel
+### Options
 
-Most appearance and behavior controls live in **`/oo config`** (or right-click the minimap button): background opacity (0–100%, independent of text/icons), scale, font size, Decimus model size + a position reset, and toggles for the dock, model, voice, rune guide, body watermark, and minimap button.
+Everything lives in **`/oo config`** (or right-click the minimap button), organized into tabs:
+
+- **General** — what the addon does, command help, and FAQ
+- **Panels** — show/size each panel (Folio · Devouring Watch · Omnium Counsel · Standalone), per-edge background fill, mascot, and text controls
+- **Appearance** — ornate frame style/size/thickness/opacity, dividers, the Nilhammer forge bar, the weekly-quest gem bar, and banners
+- **Omnium Advisors** — pick & size the advisor model, lock its position, toggle voice, and view your Void Favor
+- **Settings** — minimap button, changelog, and **profiles** (copy / reset / import / export)
+
+The same options table also appears under **Escape → Options → AddOns → OmniumObservator**.
 
 ---
 
-## Compatibility / Midnight Notes
+## Compatibility / Midnight notes
 
-Reads the folio via `C_Traits` (tree 1186), currencies via `C_CurrencyInfo`, items via `C_Item`, and never modifies the Blizzard folio frame (the panels overlay it, parented to `UIParent`).
+OmniumObservator reads the folio via `C_Traits` (tree 1186), currencies via `C_CurrencyInfo`, items via `C_Item`, and auras via `C_UnitAuras`. It **never modifies the Blizzard folio frame** — the panels overlay it (parented to `UIParent`) and only post-hook the folio's show/hide, so the protected frame is never tainted.
 
 ---
 
 ## Changelog
 
+### v1.0.5
+
+**Devouring Watch (the old DevouringWatch addon, merged in)**
+- The Voidstorm panel is now **Devouring Watch** and carries a live **Void Assault** scan (Eversong / Zul'Aman) with weekly status, alongside the full economy readout. The standalone DevouringWatch addon is retired — everything it did now lives here.
+
+**The Nilhammer forge**
+- A **forge-progress bar** tracks the one-time Voidforge build, then repurposes to your live Nebulous Voidcore cap once the Ascendant Nilhammer is forged. Tunable fill texture, color, height, inset, and glow.
+
+**Void Favor, advisors & Xal'atath**
+- A **Void Favor** counter that grows as you progress the folio, unlocking alternate advisor models (Terminas, Riko, and eventually yourself) to summon in Decimus's place.
+- **Xal'atath** occasionally crashes the party once you're several weeks in — and gets up to real mischief once all five weeks are done.
+
+**Appearance & layout**
+- Rewritten options on **AceConfig** with real dropdowns, media pickers, and clean tabs (mirrored into the Blizzard AddOns settings).
+- **Per-character profiles** with copy/reset and shareable import/export strings.
+- A pile of new fit controls: **per-panel width/height**, **per-edge background fill**, **frame size/thickness/offset**, divider thickness, panel title color, **weekly-quest gem bar**, banners, and a standalone panel with its **own opacity and frame style**.
+- Weekly list recolored: **done = rarity color, next = amber, future = gray**.
+- **Hover tooltips** on resource rows and progress gems.
+
 ### v1.0.4
-
-**In-folio embed**
-- The tracker now embeds *inside* the Omnium Folio frame as **draggable panels** flanking the rune tree — "This week" (left) and "Voidstorm" (right), plus an optional "Decimus's Counsel" rune-guide panel. Each panel remembers where you drag it; the standalone panel hides while the folio is open.
-
-**Decimus Voidstorm economy**
-- The Voidstorm panel tracks the full economy: **Motes of Omnial Inquiry**, **Nebulous bonus rolls** (held / weekly cap), **Ascendant Voidcores** and **Ascendant Voidshard** counts, and the **Void-Touched Orbs** counter (shown only when you're specced into that rune).
-- **Feeding the Nilhammer** weekly status added to the This-week panel.
-
-**Decimus, your void mentor**
-- An interactive **3D Decimus model** can be summoned into the folio (`/oo model`): left-drag to rotate, scroll to zoom, right-drag to move him anywhere; size slider + position reset in options.
-- He **speaks his real in-game voice lines** — a text bubble plus voice-over — when the folio opens and when you click him (`/oo voice` to toggle).
-
-**Decimus's Counsel — rune advisor**
-- A recommended-build panel with **real rune icons**, cycling **8 builds** across two sources: the Omnium Folio guide and **Method.gg** (the raiding/DPS authority). `[>]` header button or `/oo build` to cycle.
-
-**Appearance & controls**
-- Weekly runes now light up in **WoW loot-rarity colors** (white → green → blue → purple → orange).
-- New **options panel** (`/oo config` / right-click minimap): **background opacity** (0–100%, separate from text and icons so they stay crisp), scale, **font size**, Decimus model size + reset, and toggles for the dock, model, voice, rune guide, watermark, and minimap button.
-- **Real game-icon chips** on every resource row; a larger **mascot portrait** + a faint body watermark; **void-purple borders**; wider panels.
-- **Collapsible** weekly list (`[+]`/`[-]` header button).
-- Fixed an options-panel freeze (Escape now reliably closes it).
+- In-folio embed (three draggable panels), the Decimus Voidstorm economy, an interactive voiced 3D Decimus model, role-based rune Counsel (Folio guide + Method.gg), rarity-colored weeks, the first options panel, collapsible weeks, and font/opacity controls.
 
 ### v1.0.3
-- **Omnium Folio dock** — companion panel anchored to the in-game folio frame showing Motes, Void-Touched Orbs, the weekly reset countdown, and week progress
-- **Motes of Omnial Inquiry** — live count from the folio trait tree (`C_Traits`, tree 1186 / currency 4230)
-- Weekly reset timer; suite restyle; week-progress check/bullet visuals; orb counter hardened against a secret value
+- Omnium Folio dock; Motes of Omnial Inquiry (live from the trait tree); weekly reset timer; suite restyle.
 
 ### v1.0.2
-- Live Void-Touched Orbs counter; minimap button and AddOns-list icon
+- Live Void-Touched Orbs counter; minimap button and AddOns-list icon.
 
 ### v1.0.1
-- Auto-detect the current "Seeking Knowledge" week; Interface 120007
+- Auto-detect the current *Seeking Knowledge* week; Interface 120007.
 
 ### v1.0.0
-- Initial release: weekly unlock tracker, achievement display, weekly quest tracking
+- Initial release: weekly unlock tracker, achievement display, weekly quest tracking.
 
 ---
 
@@ -108,17 +132,18 @@ Reads the folio via `C_Traits` (tree 1186), currencies via `C_CurrencyInfo`, ite
 <details>
 <summary>Planned</summary>
 
-- **Curved corners + void background** — custom border and panel-body artwork
-- **Per-class stat-rune picks** — pull Method.gg's spec-specific stat rune instead of the generic "spec priority" line
-- **Fully voiced Decimus** — pair each voice line to its bubble text (and add his full line set)
-- **More weekly data** — Nightmare Prey Hunts, a Voidhammer forge-progress bar (Voidshards → next Ascendant Voidcore), Spark cooldown, catalyst charges
-- **Slotted-rune readout** — show which runes you've actually picked via `C_Traits` node info
+- **Slotted-rune readout** — show the runes you've actually specced (via `C_Traits`) beside the recommended build
+- **Per-class/spec builds** — spec-specific rune recommendations (Icy Veins / Wowhead / Method.gg), with the base builds always available and tooltips explaining each pick
+- **Per-race advisor voice** — let the "You" advisor speak, drawn from WoW's generic per-race voice sets
+- **Great Vault progress** — weekly reward slots at a glance, plus a one-click open
+- **Spark & catalyst tracking** — crafting/upgrade currency and catalyst charge timer
+- **More forge data** — a weekly Voidcore catalyze counter
 
 </details>
 
 ---
 
-## Feature Requests
+## Feature requests
 
 <details>
 <summary>How to request</summary>
