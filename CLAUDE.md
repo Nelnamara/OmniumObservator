@@ -1,10 +1,12 @@
 # OmniumObservator — CLAUDE.md
 
 **Omnium Folio companion** for WoW Midnight 12.0.7. Author: Nelnamara.
-Embeds draggable panels **inside** the Omnium Folio frame (This week / Voidstorm /
-Decimus's Counsel), tracks the full Decimus Voidstorm economy, shows rarity-colored
-weekly runes, an interactive **voiced 3D Decimus model**, a role-based rune advisor
-(Folio guide + Method.gg), an options panel, and a standalone glance panel + minimap button.
+Embeds draggable panels **inside** the Omnium Folio frame (This Week / **Devouring Watch** /
+**Omnium Counsel**), tracks the full Voidstorm economy + live **Void Assaults** (merged from
+the retired DevouringWatch addon), shows rarity-colored weekly runes, an interactive
+**voiced 3D advisor model** (Decimus + favor-unlocked advisors), a role-based rune advisor
+(Folio guide + Method.gg), an **AceConfig** options panel with per-character profiles, and a
+standalone glance panel + minimap button.
 
 ## Files
 - `OmniumObservator.lua` — single-file addon.
@@ -14,7 +16,7 @@ weekly runes, an interactive **voiced 3D Decimus model**, a role-based rune advi
 - **Builders:** `BuildLeftLines` (weeks+rarity+Nilhammer+reset, collapsible via `db.weeksCollapsed`), `BuildRightLines` (Motes/Nebulous/Voidcores/Voidshard/orbs, real icons via `IconTag(fileID)`), `BuildGuideLines` (role build from `ROLE_BUILDS`), `BuildLines` (standalone = left+right combined).
 - **Decimus model:** `UpdateModel()` — `PlayerModel` parented to UIParent, `SetCreature(NPC_DECIMUS=235697)`, left-drag rotate / scroll zoom / **right-drag move** / click→`DecimusClicked` (7 quick clicks = rare-line easter egg). `DecimusSpeak(rare)` shows bubble + `SetAnimation` + `PlaySoundFile(DECIMUS_SOUNDS[..], "Dialog")` (VO FileDataIDs; seeded `327617`). `db.showModel`/`db.decimusVoice`/`db.modelScale`/`db.modelPos`.
 - **Appearance:** `ApplyAppearance()` — `db.alpha` is **background-only** opacity (SetBackdropColor alpha, 0–1), text/icons stay opaque; watermark = mascot at low alpha; `db.scale` (standalone); `db.fontSize` (dynamic rowH in RenderLines). Palette border = void purple.
-- **Config:** `BuildConfig()` — registered in `UISpecialFrames` (Escape closes; fixes the old freeze). Sliders (opacity/scale/Decimus size) + reset button + toggles.
+- **Config (v1.0.5 — AceConfig rewrite):** an **AceConfig** options table (`RegisterOptionsTable("OmniumObservator", ...)`, opened via AceConfigDialog and mirrored into Blizzard Settings → AddOns), modelled on CDTL3 — real dropdowns, LSM media pickers, tabbed groups (General / Panels / Appearance / Omnium Advisors / Settings). The DB is now **AceDB** (`OO.dbObj`, profile at `OO.dbObj.profile`), with per-character profiles via **AceDBOptions** and shareable **import/export** (`OO:ExportProfile`/`OO:ImportProfile` = AceSerializer + LibDeflate). This replaced the old hand-rolled `BuildConfig`/`UISpecialFrames` panel. A custom AceGUI widget renders the live rotating 3D advisor model inside the options.
 
 ## Key data / APIs
 - Weekly quest IDs (one-time **permanent** unlocks, not repeatable): `96410` (w1), `96441` (w2), `96442` (w3), `96443` (w4), `96444` (w5). Progress is inferred: highest completed week + 1 = next available (`IsQuestFlaggedCompleted` is permanent).
@@ -50,7 +52,11 @@ Nilhammer weekly *progress* (currently just done/not — the "3/3" needs the que
 - BigWigs packager on **`v*` tag push**. CurseForge secret: **`CURSFORGE_API_KEY`** (misspelled, leave as-is).
 - Local test: copy to `D:\World of Warcraft\_retail_\Interface\AddOns\OmniumObservator\`.
 - **1.0.4** (released, tag `v1.0.4`): in-folio embed (3 panels), Voidforge economy, voiced/movable Decimus model, role-based rune Counsel, rarity weeks, options panel, collapsible weeks, font/opacity controls.
-- Current version: **1.0.5** (Interface 120007, **in dev — not yet tagged**). Themed-art update: **texture-picker menus** (CDTL3-style) for 3 sets — **Frame style** (`border1..5.tga`, default F13), **Forge bar style** (`forge1..5.tga`, default M12), **Divider style** (`divider1..5.tga`, default V12); all keyed-from-green PixAI art. **Void panel frame is now ON by default** — the old broken 9-slice `border.tga` was removed and replaced with clean thin frames (slice margin 48, tuned to 256px art). New **Nilhammer forge bar** widget (ornate frame + fill, reads weekly feed) and **glowing void-line dividers** (replace the plain purple rule). New config **Theme tab** (5 tabs now, window 400 wide) + native-Settings parity; slash `/oo frame <1-5>`. Still TODO for 1.0.5: per-class stat picks, full voiced Decimus (VO↔text pairs), Prey Hunts/Spark/catalyst.
+- Current version: **1.0.5** (Interface 120007), **released**. Major release, four headline systems:
+  1. **DevouringWatch merged in** — the old "Voidstorm" panel is now **Devouring Watch**, carrying a live Void Assault POI scan (`C_AreaPoiInfo.GetEventsForMap`), the Eversong/Zul'Aman weekly assault quests, and Field Accolade / Voidlight Marl currencies, on top of the economy readout. The **standalone DevouringWatch addon is retired** — all of it lives here now.
+  2. **AceConfig / AceDB rewrite** (see Config above) — real options UI, per-character profiles, import/export. Replaced the hand-rolled panel.
+  3. **Void Favor & advisors** — a favor counter grows with folio engagement (open folio/click model daily; bigger one-time boosts for new weeks, forging the Ascendant Nilhammer, and the *Omnium Folio Studies* achievement) and unlocks alternate summonable advisor models: Decimus (default), **Terminas** `235767` (favor 8), **Riko** `229749` (favor 18), eventually "You" — each with real VO. **Xal'atath** randomly hijacks the model frame to mock you, and at 5/5 weeks nudges panels out of place (a *Reset all panel positions* fixes it).
+  4. **Nilhammer forge bar** + themed-art **texture pickers** (frame/forge/divider/banner `*.tga`; `/oo frame|banner <1-5>`). Nilhammer quests: feed `95269` (repeatable, no lasting flag), Ascendant `95271` (permanent flag once forged).
 
 ### Themed-art picker architecture (v1.0.5)
 - `OO:FrameTexPath/ForgeTexPath/DividerTexPath()` map `db.frameTex/forgeTex/dividerTex` (1..5) → `Media\<name><N>.tga`. `MEDIA` local constant near `ApplySkinGeometry`.
